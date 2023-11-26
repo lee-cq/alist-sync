@@ -1,6 +1,7 @@
 # coding: utf8
 import asyncio
 import logging
+from pathlib import PurePosixPath
 
 from alist_sdk import AsyncClient, Item, RequestError
 from .models import SyncDir, AlistServer
@@ -15,6 +16,12 @@ class ScanDir:
         self.client = client
         self.itme_list: list[Item] = []
 
+    async def async_run(self, scan_path):
+        """异步运行"""
+        await self.scan(scan_path)
+        await self.lock()
+        return SyncDir(base_path=scan_path, items=self.itme_list)
+
     async def lock(self):
         pre = f"{id(self)}_scan"
         while True:
@@ -24,6 +31,8 @@ class ScanDir:
 
     async def scan(self, path):
         logger.info('扫描目录 %s 中的文件.', path)
+        if isinstance(path, PurePosixPath):
+            path = path.as_posix()
         res = await self.client.list_files(path, per_page=0, refresh=True)
         if res.code != 200:
             raise RequestError(f"[code: {res.code}] {res.message}")
@@ -36,16 +45,7 @@ class ScanDir:
                 self.itme_list.append(item)
 
 
-async def scan_dir(alist_info: AlistServer, scan_path) -> SyncDir:
+async def scan_dir(client: AsyncClient, scan_path) -> SyncDir:
     """扫描目录"""
-    _ac = AsyncClient(base_url=alist_info.base_url, verify=False, timeout=30)
-    if alist_info.token:
-        await _ac.set_token(alist_info.token)
-    if alist_info.username:
-        logger.info("使用username登陆: %s", alist_info.username)
-        await _ac.login(alist_info.username, alist_info.password)
+    return await ScanDir(client).async_run(scan_path)
 
-    _s = ScanDir(_ac)
-    await _s.scan(scan_path)
-    await _s.lock()
-    return SyncDir(base_path=scan_path, items=_s.itme_list)
