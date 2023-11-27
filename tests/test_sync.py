@@ -9,6 +9,7 @@ from alist_sdk import Client, Item, AsyncClient
 from alist_sync.models import AlistServer, SyncDir
 from alist_sync.scan_dir import scan_dir
 from alist_sync.copy_to_target import CopyToTarget
+
 from .common import create_storage_local, clear_dir
 
 WORKDIR = Path(__file__).parent
