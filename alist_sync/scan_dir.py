@@ -33,9 +33,9 @@ class ScanDir:
         logger.info('扫描目录 %s 中的文件.', path)
         if isinstance(path, PurePosixPath):
             path = path.as_posix()
-        res = await self.client.list_files(path, per_page=0, refresh=True)
+        res = await self.client.list_files(path, refresh=True)
         if res.code != 200:
-            raise RequestError(f"[code: {res.code}] {res.message}")
+            raise RequestError(f"[code: {res.code}] {res.message} ({path})")
         for item in res.data.content or []:
             item: Item
             item.parent = path

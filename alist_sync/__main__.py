@@ -1,10 +1,13 @@
 #!/bin/env python3
 # coding: utf8
 
+import logging
 from typer import Typer, Option, echo, style
 
 from alist_sync.models import AlistServer
+from alist_sync.copy_to_target import CopyToTarget
 
+logging.basicConfig(level='INFO')
 app = Typer()
 
 
@@ -20,8 +23,12 @@ def copy(
 ):
     """复制任务"""
     alist_info = AlistServer(base_url=base_url, username=username, password=password, token=token, verify=verify)
-    echo(f"Will Be Copy {source} -> {target} on {alist_info.base_url}[{alist_info.username}]")
-    return
+    echo(f"Will Be Copy '{source}' -> {target} on {alist_info.base_url} [{alist_info.username}]")
+    return CopyToTarget(
+            alist_info,
+            source_dir=source,
+            target_path=target,
+        ).run()
 
 
 @app.command()

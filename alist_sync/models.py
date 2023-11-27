@@ -1,7 +1,7 @@
 from pathlib import PurePosixPath
 from typing import Optional
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, computed_field, field_serializer
 from alist_sdk import Item
 
 __all__ = ["AlistServer", "SyncDir", "CopyTask", "SyncTask"]
@@ -41,6 +41,10 @@ class CopyTask(BaseModel):
     status: str = "init"  # 任务状态 init: 初始化，created: 已创建，"getting src object": 运行中，"": 已完成，"failed": 失败
     message: Optional[str] = ''
 
+    @field_serializer('copy_source', 'copy_target')
+    def serializer_path(self, value: PurePosixPath, info):
+        return value.as_posix()
+
     @computed_field()
     @property
     def name(self) -> str:
@@ -69,6 +73,6 @@ if __name__ == '__main__':
             alist_info=AlistServer(),
             sync_dirs=[],
             copy_tasks={
-                'aa': CopyTask(copy_name='aa', copy_source=PurePosixPath('/a'), copy_target=PurePosixPath('/b'))},
+                'aa': CopyTask(copy_name='aa', copy_source=PurePosixPath('/a'), copy_target=PurePosixPath('/b/aa'))},
         ).model_dump_json(indent=2)
     )

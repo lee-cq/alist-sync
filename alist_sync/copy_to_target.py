@@ -23,9 +23,8 @@ class CopyToTarget:
             sync_dirs=[],
             copy_tasks={}
         )
+        self.load_from_cache()
 
-    def __call__(self, *args, **kwargs):
-        pass
 
     def load_from_cache(self):
         """从缓存中加载"""
@@ -105,7 +104,6 @@ class CopyToTarget:
             sync_target: SyncDir
             self.create_copy_task(sync_source, sync_target)
             logger.info("[%s -> %s] 复制任务信息全部创建完成。", sync_source.base_path, sync_target.base_path)
-        self.save_to_cache()
 
     async def copy_files(self):
         """复制文件"""
