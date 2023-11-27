@@ -1,0 +1,16 @@
+{
+    "recommendations": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-ceintl.vscode-language-pack-zh-hans",  // 中文插件
+
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.isort",
+        "ms-python.autopep8",
+        "ms-python.debugpy",
+
+        "github.github-vscode-theme",
+        "github.copilot"
+    ]
+}

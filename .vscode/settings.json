@@ -1,0 +1,12 @@
+{
+    "editor.indentSize": "tabSize",
+    "extensions.closeExtensionDetailsOnViewChange": true,
+    "[python]": {
+        "editor.tabSize": 4,
+        "editor.formatOnSave": true,
+        "editor.formatOnPaste": true,
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.formatOnType": true,
+        "editor.wordBasedSuggestions": false
+    }
+}
