@@ -150,13 +150,22 @@ class CopyToTarget:
                 await asyncio.sleep(5)
 
         asyncio.create_task(create_copy())
+
+        await self.check_status()
+
+        logger.info("复制完成。")
+
+    async def check_status(self):
+        """状态更新"""
         while True:
             await asyncio.sleep(1)
             task_done = await self.client.task_done('copy')
             await self.client.task_clear_done('copy')
-            if await self.client.task_undone('copy'):
+            task_undone = await self.client.task_undone('copy')
+            if not task_undone.data:
                 break
-            logger.info(f"等待复制完成 ...")
+            logger.info(f"等待复制完成, 剩余 %d ...", len(task_undone.data))
+
             for t in task_done.data or []:
                 t: Task
                 if t.name not in self.sync_task.copy_tasks:
@@ -178,5 +187,3 @@ class CopyToTarget:
                     self.sync_task.copy_tasks[t.name].status = 'getting src object'
                     self.save_to_cache()
                     continue
-
-        logger.info("复制完成。")
