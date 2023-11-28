@@ -31,6 +31,10 @@ class SyncDir(BaseModel):
             self.items_relative = [i.full_name.relative_to(self.base_path) for i in self.items]
         return path in self.items_relative
 
+    @field_serializer('items_relative')
+    def serializer_items_relative(self, value, info) -> list:
+        return []
+
 
 class CopyTask(BaseModel):
     """复制任务"""
@@ -56,8 +60,9 @@ class CopyTask(BaseModel):
         target_full_path = self.copy_target.joinpath(self.copy_name)
         target_provider = target_full_path.parents[-2]
         target_path = target_full_path.relative_to(target_provider)
+        _t = '' if target_path.parent.as_posix() == '.' else target_path.parent.as_posix()
 
-        return f"copy [{source_provider}](/{source_path}) to [{target_provider}](/{target_path.parent})"
+        return f"copy [{source_provider}](/{source_path}) to [{target_provider}](/{_t})"
 
 
 class SyncTask(BaseModel):

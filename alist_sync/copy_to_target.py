@@ -17,7 +17,9 @@ class CopyToTarget:
         self.client = AsyncClient(timeout=30, **alist_info.model_dump())
         self.target_path = target_path
         self.source_dir = source_dir
-        self.sync_task_cache_file = cache_dir / f"sync_task_{sha1_6(target_path)}_{sha1_6(target_path.sort())}.json"
+        self.sync_task_cache_file = cache_dir.joinpath(
+            f"sync_task_{sha1_6(source_dir)}_{sha1_6(target_path.sort())}.json"
+        )
         self.sync_task = SyncTask(
             alist_info=alist_info,
             sync_dirs=[],
@@ -25,12 +27,12 @@ class CopyToTarget:
         )
         self.load_from_cache()
 
-
     def load_from_cache(self):
         """从缓存中加载"""
         if not self.sync_task_cache_file.exists():
             return
-        self.sync_task = SyncTask.model_validate_json(self.sync_task_cache_file.read_text())
+        self.sync_task = SyncTask.model_validate_json(
+            self.sync_task_cache_file.read_text())
 
     def save_to_cache(self):
         """保存到缓存中"""
@@ -47,14 +49,16 @@ class CopyToTarget:
             await self.scans()
             self.save_to_cache()
         else:
-            logger.info(f"一件从缓存中找到 %d 个 SyncDir", len(self.sync_task.sync_dirs))
+            logger.info(f"一件从缓存中找到 %d 个 SyncDir",
+                        len(self.sync_task.sync_dirs))
 
         # 创建复制列表
         if not self.sync_task.copy_tasks:
             await self.create_copy_list()
             self.save_to_cache()
         else:
-            logger.info(f"一件从缓存中找到 %d 个 CopyTask", len(self.sync_task.copy_tasks))
+            logger.info(f"一件从缓存中找到 %d 个 CopyTask",
+                        len(self.sync_task.copy_tasks))
 
         # 复制文件
         await self.copy_files()
@@ -68,7 +72,8 @@ class CopyToTarget:
             )
 
         for sync_dir in [self.source_dir, *self.target_path]:
-            asyncio.create_task(scan(sync_dir), name=f"{id(self)}_scan_{sync_dir}")
+            asyncio.create_task(
+                scan(sync_dir), name=f"{id(self)}_scan_{sync_dir}")
 
         while True:
             await asyncio.sleep(1)
@@ -85,25 +90,33 @@ class CopyToTarget:
             name = copy_path.name
             if target.in_items(copy_path):
                 # 目标存在，判断是否需要更新
-                logger.debug("[%s -> %s] %s: 目标存在", source.base_path, target.base_path, copy_path)
+                logger.debug("[%s -> %s] %s: 目标存在",
+                             source.base_path, target.base_path, copy_path)
                 continue
 
             task = CopyTask(
-                    copy_name=name,  # 需要复制到文件名
-                    copy_source=PurePosixPath(source.base_path).joinpath(copy_path.parent),  # 需要复制的源文件夹
-                    copy_target=PurePosixPath(target.base_path).joinpath(copy_path.parent),  # 需要复制到的目标文件夹
-                )
+                copy_name=name,  # 需要复制到文件名
+                copy_source=PurePosixPath(source.base_path).joinpath(
+                    copy_path.parent),  # 需要复制的源文件夹
+                copy_target=PurePosixPath(target.base_path).joinpath(
+                    copy_path.parent),  # 需要复制到的目标文件夹
+            )
             self.sync_task.copy_tasks[task.name] = task
-            logger.debug("[%s -> %s] %s: 已创建复制任务信息。", source.base_path, target.base_path, copy_path)
+            self.save_to_cache()
+            logger.debug("[%s -> %s] %s: 已创建复制任务信息。",
+                         source.base_path, target.base_path, copy_path)
 
     async def create_copy_list(self):
-        sync_source = [_s for _s in self.sync_task.sync_dirs if _s.base_path == self.source_dir][0]
-        sync_targets = [_s for _s in self.sync_task.sync_dirs if _s.base_path in self.target_path]
+        sync_source = [
+            _s for _s in self.sync_task.sync_dirs if _s.base_path == self.source_dir][0]
+        sync_targets = [
+            _s for _s in self.sync_task.sync_dirs if _s.base_path in self.target_path]
 
         for sync_target in sync_targets:
             sync_target: SyncDir
             self.create_copy_task(sync_source, sync_target)
-            logger.info("[%s -> %s] 复制任务信息全部创建完成。", sync_source.base_path, sync_target.base_path)
+            logger.info("[%s -> %s] 复制任务信息全部创建完成。",
+                        sync_source.base_path, sync_target.base_path)
 
     async def copy_files(self):
         """复制文件"""
@@ -115,7 +128,8 @@ class CopyToTarget:
                 self.save_to_cache()
                 logger.info("[%s] 复制任务已经在AList中创建。", task.name)
             else:
-                logger.warning("[%s] 复制任务创建失败。message: [%d]%s", task.name, res.code, res.message)
+                logger.warning("[%s] 复制任务创建失败。message: [%d]%s",
+                               task.name, res.code, res.message)
 
         async def create_copy():
             while True:
@@ -142,6 +156,7 @@ class CopyToTarget:
             await self.client.task_clear_done('copy')
             if await self.client.task_undone('copy'):
                 break
+            logger.info(f"等待复制完成 ...")
             for t in task_done.data or []:
                 t: Task
                 if t.name not in self.sync_task.copy_tasks:

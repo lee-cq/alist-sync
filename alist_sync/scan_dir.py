@@ -29,18 +29,29 @@ class ScanDir:
             if not [i.get_name() for i in asyncio.all_tasks() if pre in i.get_name()]:
                 return
 
+    async def list_files(self, path, retry=5):
+        """列出目录"""
+        res = await self.client.list_files(path, refresh=True)
+        if res.code != 200:
+            logger.warning("扫描目录异常：[code: %d] %s", res.code, res.message)
+            if retry:
+                return await self.list_files(path=path, retry=retry - 1)
+            exit(1)
+        return res
+
     async def scan(self, path):
         logger.info('扫描目录 %s 中的文件.', path)
         if isinstance(path, PurePosixPath):
             path = path.as_posix()
-        res = await self.client.list_files(path, refresh=True)
-        if res.code != 200:
-            raise RequestError(f"[code: {res.code}] {res.message} ({path})")
+        res = await self.list_files(path=path)
         for item in res.data.content or []:
             item: Item
             item.parent = path
             if item.is_dir:
-                asyncio.create_task(self.scan(item.full_name), name=f"{id(self)}_scan_{path}")
+                asyncio.create_task(
+                    self.scan(item.full_name),
+                    name=f"{id(self)}_scan_{path}"
+                )
             else:
                 self.itme_list.append(item)
 
@@ -48,4 +59,3 @@ class ScanDir:
 async def scan_dir(client: AsyncClient, scan_path) -> SyncDir:
     """扫描目录"""
     return await ScanDir(client).async_run(scan_path)
-
