@@ -17,9 +17,15 @@ class CopyToTarget:
         self.client = AsyncClient(timeout=30, **alist_info.model_dump())
         self.target_path = target_path
         self.source_dir = source_dir
+        target_path.sort()
         self.sync_task_cache_file = cache_dir.joinpath(
-            f"sync_task_{sha1_6(source_dir)}_{sha1_6(target_path.sort())}.json"
+            f"sync_task_{sha1_6(source_dir)}_{sha1_6(target_path)}.json"
         )
+        logger.info("缓存文件名: %s -> %s : %s .",
+                    source_dir,
+                    target_path,
+                    self.sync_task_cache_file
+                    )
         self.sync_task = SyncTask(
             alist_info=alist_info,
             sync_dirs=[],
@@ -108,9 +114,11 @@ class CopyToTarget:
 
     async def create_copy_list(self):
         sync_source = [
-            _s for _s in self.sync_task.sync_dirs if _s.base_path == self.source_dir][0]
+            _s for _s in self.sync_task.sync_dirs if _s.base_path == self.source_dir
+        ][0]
         sync_targets = [
-            _s for _s in self.sync_task.sync_dirs if _s.base_path in self.target_path]
+            _s for _s in self.sync_task.sync_dirs if _s.base_path in self.target_path
+        ]
 
         for sync_target in sync_targets:
             sync_target: SyncDir
@@ -146,14 +154,15 @@ class CopyToTarget:
                             dst_dir=copy_task.copy_target.as_posix(),
                             files=[copy_task.copy_name, ]
                         ),
-                        name=f"{id(self)}_copy_{copy_task.copy_name}")
+                        name=f"{id(self)}_copy_{copy_task.copy_name}"
+                    )
                 await asyncio.sleep(5)
 
         asyncio.create_task(create_copy())
 
         await self.check_status()
-
         logger.info("复制完成。")
+        self.sync_task_cache_file.unlink(missing_ok=True)
 
     async def check_status(self):
         """状态更新"""
