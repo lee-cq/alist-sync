@@ -1,8 +1,17 @@
 # alist-sync
 
-Alist 多驱动同步工具
+Alist 同步工具
 
-利用GitHub Actions实现使用Github的计算资源和网络资源帮忙我们同步各个网盘之间的数据。
+利用GitHub Actions实现利用Github的计算资源和网络资源帮忙我们同步各个网盘之间的数据。
+
+
+## 预期同步模式：
+
+### 1. copy 简单复制
+
+### 2. mirror 镜像复制
+
+### 3. sync 多源双向复制
 
 
 ## 初步目标，单向有无同步
