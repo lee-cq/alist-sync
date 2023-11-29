@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 
 import logging
@@ -15,5 +16,6 @@ def sha1_6(s):
     return hs
 
 
-if __name__ == '__main__':
-    sha1("123456")
+def async_all_task_names() -> set:
+    """获取全部的task的name"""
+    return {t.get_name() for t in asyncio.all_tasks()}

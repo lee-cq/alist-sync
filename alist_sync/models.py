@@ -4,6 +4,8 @@ from typing import Optional
 from pydantic import BaseModel, computed_field, field_serializer
 from alist_sdk import Item
 
+from .alist_client import AlistClient
+
 __all__ = ["AlistServer", "SyncDir", "CopyTask", "SyncTask"]
 
 
@@ -17,6 +19,7 @@ class AlistServer(BaseModel):
 
     # httpx 的参数
     verify: Optional[bool] = True
+    headers: Optional[dict] = None
 
 
 class SyncDir(BaseModel):
@@ -28,12 +31,15 @@ class SyncDir(BaseModel):
     def in_items(self, path) -> bool:
         """判断path是否在items中"""
         if not self.items_relative:
-            self.items_relative = [i.full_name.relative_to(self.base_path) for i in self.items]
+            self.items_relative = [i.full_name.relative_to(
+                self.base_path) for i in self.items]
         return path in self.items_relative
 
     @field_serializer('items_relative')
     def serializer_items_relative(self, value, info) -> list:
-        return []
+        value: list[PurePosixPath] = []
+        info: object
+        return value
 
 
 class CopyTask(BaseModel):
@@ -42,7 +48,8 @@ class CopyTask(BaseModel):
     copy_name: str  # 需要复制到文件名
     copy_source: PurePosixPath  # 需要复制的源文件夹
     copy_target: PurePosixPath  # 需要复制到的目标文件夹
-    status: str = "init"  # 任务状态 init: 初始化，created: 已创建，"getting src object": 运行中，"": 已完成，"failed": 失败
+    # 任务状态 init: 初始化，created: 已创建，"getting src object": 运行中，"": 已完成，"failed": 失败
+    status: str = "init"
     message: Optional[str] = ''
 
     @field_serializer('copy_source', 'copy_target')
@@ -63,6 +70,19 @@ class CopyTask(BaseModel):
         _t = '' if target_path.parent.as_posix() == '.' else target_path.parent.as_posix()
 
         return f"copy [{source_provider}](/{source_path}) to [{target_provider}](/{_t})"
+
+    async def _run(self, client: AlistClient, ):
+        """异步运行类 - 该类负责Copy Task 的全部生铭周期。
+
+        1. 在alist中创建 复制任务             :: init -> created
+        2. 检查复制任务已经存在于 undone_list :: created -> running
+        3. 检查任务已经失败 (重试3次)         :: running -> failed
+        4. 检查任务已经完成                   :: running -> success
+        """
+        if self.name in client.cached_copy_task_undone[-1]:
+            self.status = 'created'
+        if self.name in client.cached_copy_task_done[-1]:
+            self.status = 'success'
 
 
 class SyncTask(BaseModel):
