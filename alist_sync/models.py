@@ -1,7 +1,8 @@
-from pathlib import PurePosixPath
+import datetime
+from pathlib import PurePosixPath, Path
 from typing import Optional
 
-from pydantic import BaseModel, computed_field, field_serializer
+from pydantic import BaseModel, computed_field, Field
 from alist_sdk import Item
 
 from .alist_client import AlistClient
@@ -26,20 +27,21 @@ class SyncDir(BaseModel):
     """同步目录模型，定义一个同步目录"""
     base_path: str  # 同步基础目录
     items: list[Item]  # Item列表
-    items_relative: Optional[list] = []  # Item列表相对路径
 
-    def in_items(self, path) -> bool:
-        """判断path是否在items中"""
-        if not self.items_relative:
-            self.items_relative = [i.full_name.relative_to(
-                self.base_path) for i in self.items]
-        return path in self.items_relative
+    items_relative: Optional[list] = Field(exclude=True)  # Item列表相对路径
 
-    @field_serializer('items_relative')
-    def serializer_items_relative(self, value, info) -> list:
-        value: list[PurePosixPath] = []
-        info: object
-        return value
+    # def in_items(self, path) -> bool:
+    #     """判断path是否在items中"""
+    #     if not self.items_relative:
+    #         self.items_relative = [i.full_name.relative_to(
+    #             self.base_path) for i in self.items]
+    #     return path in self.items_relative
+
+    # @field_serializer('items_relative')
+    # def serializer_items_relative(self, value, info) -> list:
+    #     value: list[PurePosixPath] = []
+    #     info: object
+    #     return value
 
 
 class CopyTask(BaseModel):
@@ -52,9 +54,9 @@ class CopyTask(BaseModel):
     status: str = "init"
     message: Optional[str] = ''
 
-    @field_serializer('copy_source', 'copy_target')
-    def serializer_path(self, value: PurePosixPath, info):
-        return value.as_posix()
+    # @field_serializer('copy_source', 'copy_target')
+    # def serializer_path(self, value: PurePosixPath, info):
+    #     return value.as_posix()
 
     @computed_field()
     @property
@@ -74,6 +76,8 @@ class CopyTask(BaseModel):
     async def _run(self, client: AlistClient, ):
         """异步运行类 - 该类负责Copy Task 的全部生铭周期。
 
+        在异步循环中反复检查
+
         1. 在alist中创建 复制任务             :: init -> created
         2. 检查复制任务已经存在于 undone_list :: created -> running
         3. 检查任务已经失败 (重试3次)         :: running -> failed
@@ -92,12 +96,29 @@ class SyncTask(BaseModel):
     copy_tasks: dict[str, CopyTask]  # 复制目录
 
 
+class Config(BaseModel):
+    """配置"""
+    name: str
+    alist_info: AlistServer
+    config_dir: PurePosixPath
+    cache_dir: Path
+    sync_group: list[str]
+
+    update_time: datetime.datetime
+    create_time: datetime.datetime
+
+
 if __name__ == '__main__':
     print(
         SyncTask(
             alist_info=AlistServer(),
             sync_dirs=[],
             copy_tasks={
-                'aa': CopyTask(copy_name='aa', copy_source=PurePosixPath('/a'), copy_target=PurePosixPath('/b/aa'))},
+                'aa': CopyTask(
+                    copy_name='aa',
+                    copy_source=PurePosixPath('/a'),
+                    copy_target=PurePosixPath('/b/aa')
+                )
+            },
         ).model_dump_json(indent=2)
     )

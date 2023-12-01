@@ -5,6 +5,10 @@ import logging
 
 logger = logging.getLogger("alist-sync.common")
 
+__all__ = [
+    "sha1", "sha1_6", "async_all_task_names",
+]
+
 
 def sha1(s):
     return hashlib.sha1(str(s).encode()).hexdigest()

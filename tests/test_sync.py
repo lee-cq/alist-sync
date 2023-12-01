@@ -8,7 +8,7 @@ import pytest
 from alist_sdk import Client, Item, AsyncClient
 from alist_sync.models import AlistServer, SyncDir
 from alist_sync.scan_dir import scan_dir
-from alist_sync.copy_to_target import CopyToTarget
+from alist_sync.run_copy import CopyToTarget
 
 from .common import create_storage_local, clear_dir
 
@@ -84,10 +84,7 @@ def test_run_copy():
         Path(DATA_DIR / i).touch()
 
     res = asyncio.run(
-        CopyToTarget(
-            AlistServer(base_url='http://localhost:5244', verify=False, username='admin', password='123456'),
-            source_dir="/local",
-            target_path=["/local_dst"],
-        ).async_run()
+        CopyToTarget(AlistServer(base_url='http://localhost:5244', verify=False, username='admin', password='123456'), copy,
+                     mirror, sync, sync - mult, source_dir="/local", target_path=["/local_dst"]).async_run()
     )
     assert DATA_DIR_DST.joinpath("test_scan_dir/a/a.txt").exists()

@@ -3,8 +3,10 @@ import asyncio
 import logging
 from pathlib import PurePosixPath
 
-from alist_sdk import AsyncClient, Item, RequestError
-from .models import SyncDir, AlistServer
+from alist_sdk import Item
+from .models import SyncDir
+
+from .alist_client import AlistClient
 
 logger = logging.getLogger("alist-sync.scan-dir")
 
@@ -12,7 +14,7 @@ __all__ = ["scan_dir"]
 
 
 class ScanDir:
-    def __init__(self, client: AsyncClient):
+    def __init__(self, client: AlistClient):
         self.client = client
         self.itme_list: list[Item] = []
 
@@ -56,6 +58,6 @@ class ScanDir:
                 self.itme_list.append(item)
 
 
-async def scan_dir(client: AsyncClient, scan_path) -> SyncDir:
+async def scan_dir(client: AlistClient, scan_path) -> SyncDir:
     """扫描目录"""
     return await ScanDir(client).async_run(scan_path)
