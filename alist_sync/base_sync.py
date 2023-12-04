@@ -74,4 +74,9 @@ class SyncBase:
         asyncio.run(self.async_run())
 
     async def async_run(self):
-        raise NotImplemented
+        if not self.sync_task.sync_dirs.syncs:
+            await self.scans()
+            self.save_to_cache()
+        else:
+            logger.info(f"一件从缓存中找到 %d 个 SyncDir",
+                        len(self.sync_task.sync_dirs.syncs))

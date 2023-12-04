@@ -7,7 +7,7 @@ from alist_sdk import Item
 
 from .alist_client import AlistClient
 
-__all__ = ["AlistServer", "SyncDir", "CopyTask", "SyncTask"]
+__all__ = ["AlistServer", "SyncDir", "CopyTask", "RemoveTask", "SyncTask"]
 
 
 class AlistServer(BaseModel):
@@ -30,12 +30,12 @@ class SyncDir(BaseModel):
 
     items_relative: Optional[list] = Field(exclude=True)  # Item列表相对路径
 
-    # def in_items(self, path) -> bool:
-    #     """判断path是否在items中"""
-    #     if not self.items_relative:
-    #         self.items_relative = [i.full_name.relative_to(
-    #             self.base_path) for i in self.items]
-    #     return path in self.items_relative
+    def in_items(self, path) -> bool:
+        """判断path是否在items中"""
+        if not self.items_relative:
+            self.items_relative = [i.full_name.relative_to(
+                self.base_path) for i in self.items]
+        return path in self.items_relative
 
     # @field_serializer('items_relative')
     # def serializer_items_relative(self, value, info) -> list:
@@ -89,11 +89,29 @@ class CopyTask(BaseModel):
             self.status = 'success'
 
 
+class RemoveTask(BaseModel):
+    """删除文件的任务"""
+    full_path: PurePosixPath | str
+    status: str = 'init'
+
+
+class SyncDirs(BaseModel):
+    source: Optional[SyncDir] = None
+    targets: set[SyncDir] = {}
+
+    @property
+    def syncs(self) -> set[SyncDir]:
+        if isinstance(self.source, SyncDir):
+            return self.targets ^ {self.source, }
+        return self.targets
+
+
 class SyncTask(BaseModel):
     """同步任务"""
     alist_info: AlistServer  # Alist Info
-    sync_dirs: list[SyncDir]  # 同步目录
-    copy_tasks: dict[str, CopyTask]  # 复制目录
+    sync_dirs: SyncDirs  # 同步目录
+    copy_tasks: dict[str, CopyTask] = {}  # 复制目录
+    remove_tasks: dict[str, RemoveTask] = {}  # 删除目录
 
 
 class Config(BaseModel):

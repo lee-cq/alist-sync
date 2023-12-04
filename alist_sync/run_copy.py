@@ -14,12 +14,7 @@ class CopyToTarget(SyncBase):
 
     async def async_run(self):
         """异步运行"""
-        if not self.sync_task.sync_dirs:
-            await self.scans()
-            self.save_to_cache()
-        else:
-            logger.info(f"一件从缓存中找到 %d 个 SyncDir",
-                        len(self.sync_task.sync_dirs))
+        await super().async_run()
 
         # 创建复制列表
         if not self.sync_task.copy_tasks:
@@ -57,18 +52,15 @@ class CopyToTarget(SyncBase):
                          source.base_path, target.base_path, copy_path)
 
     async def create_copy_list(self):
-        sync_source = [
-            _s for _s in self.sync_task.sync_dirs if _s.base_path == self.source_dir
-        ][0]
-        sync_targets = [
-            _s for _s in self.sync_task.sync_dirs if _s.base_path in self.target_path
-        ]
 
-        for sync_target in sync_targets:
+        for sync_target in self.sync_task.sync_dirs.targets:
             sync_target: SyncDir
-            self.create_copy_task(sync_source, sync_target)
-            logger.info("[%s -> %s] 复制任务信息全部创建完成。",
-                        sync_source.base_path, sync_target.base_path)
+            self.create_copy_task(self.sync_task.sync_dirs.source, sync_target)
+            logger.info(
+                "[%s -> %s] 复制任务信息全部创建完成。",
+                self.sync_task.sync_dirs.source.base_path,
+                sync_target.base_path
+            )
 
     async def copy_files(self):
         """复制文件"""

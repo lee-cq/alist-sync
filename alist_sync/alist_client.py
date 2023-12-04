@@ -8,6 +8,8 @@ from .common import async_all_task_names
 
 logger = logging.getLogger("alist-sync.client")
 
+__all__ = ["AlistClient"]
+
 
 class TaskStat:
     copy_task_done = 0, {}
@@ -15,6 +17,19 @@ class TaskStat:
 
 
 class AlistClient(_AsyncClient):
+
+    def __init__(self, base_url, max_connect=30, *,
+                 token=None, username=None, password=None, has_opt=False, **kwargs):
+        super().__init__(base_url, token, username=username, password=password, has_opt=has_opt, **kwargs)
+        self._max_connect = asyncio.Semaphore(max_connect)
+
+    def set_mex_connect(self, max_connect):
+        """"""
+        self._max_connect = asyncio.Semaphore(max_connect)
+
+    async def request(self, *args, **kwargs):
+        async with self._max_connect:
+            return await super().request(*args, **kwargs)
 
     async def _cache(self, attr_name, task_type):
         wait_time = 0.01
@@ -50,7 +65,6 @@ class AlistClient(_AsyncClient):
 
     @property
     def cached_copy_task_undone(self) -> tuple[int, dict[str, Task]]:
-
         """
 
         :return 更新时间, {task_name, Task, ...}
