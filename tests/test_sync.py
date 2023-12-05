@@ -129,7 +129,7 @@ def test_mirror():
     }
     items_tar2 = {
         "tar2/g.txt",
-        'e.txt',
+        'g.txt',
     }
 
     for i in items_sou:
@@ -149,7 +149,7 @@ def test_mirror():
     assert DATA_DIR_DST.joinpath("f.txt").exists()
 
     assert DATA_DIR_DST2.joinpath("tar2/g.txt").exists()
-    assert DATA_DIR_DST2.joinpath("e.txt").exists()
+    assert DATA_DIR_DST2.joinpath("g.txt").exists()
 
     asyncio.run(
         Mirror(
@@ -162,6 +162,7 @@ def test_mirror():
             targets_path=["/local_dst", "/local_dst2"]
         ).async_run()
     )
+
     assert DATA_DIR_DST.joinpath("test_scan_dir/a/a.txt").exists()
     assert DATA_DIR_DST2.joinpath("test_scan_dir/a/a.txt").exists()
 
@@ -169,4 +170,4 @@ def test_mirror():
     assert not DATA_DIR_DST.joinpath("f.txt").exists()
 
     assert not DATA_DIR_DST2.joinpath("tar2/g.txt").exists()
-    assert not DATA_DIR_DST2.joinpath("e.txt").exists()
+    assert not DATA_DIR_DST2.joinpath("g.txt").exists()

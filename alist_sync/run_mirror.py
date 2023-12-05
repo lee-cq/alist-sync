@@ -22,23 +22,27 @@ logger = logging.getLogger("alist-sync.mirror")
 class Mirror(CopyToTarget):
 
     def __init__(self, alist_info,
-                 source_dir: str = None,
-                 target_path: list[str] = []
+                 source_path: str = None,
+                 targets_path: list[str] = []
                  ):
-        super().__init__(alist_info, mode='mirror', source_dir=source_dir, target_path=target_path)
-        self.rm_list = list[RemoveTask]
+        self.mode = 'mirrors'
+        super().__init__(alist_info,
+                         source_path=source_path,
+                         targets_path=targets_path)
 
     async def async_run(self):
         await super().async_run()
 
-        # 创建复制列表
+        # 创建删除列表
         if not self.sync_task.remove_tasks:
+            logger.info("创建删除列表")
             self.create_remove_list()
             self.save_to_cache()
 
         else:
-            logger.info(f"一件从缓存中找到 %d 个 RemoveTask",
-                        len(self.sync_task.remove_tasks))
+            logger.info(
+                f"一件从缓存中找到 %d 个 RemoveTask", len(self.sync_task.remove_tasks)
+            )
 
         # 删除文件
         await self.remove_files()
@@ -49,34 +53,40 @@ class Mirror(CopyToTarget):
             item: Item
             re_path = item.full_name.relative_to(target_dir.base_path)
             if source_dir.in_items(re_path):
-                logger.debug("Jump ...")
+                logger.debug("Jump: 源[%s]中存在 -- %s ",
+                             source_dir.base_path, re_path)
                 continue
+
+            logger.info("Add：源[%s]中不存在 - %s，计划删除 ...",
+                        source_dir.base_path, re_path)
+
             self.sync_task.remove_tasks.setdefault(
-                item.full_name, RemoveTask(
-                    full_path=item.full_name
-                )
+                str(item.full_name),  # str
+                RemoveTask(full_path=item.full_name)
             )
             logger.info("添加RemoveTask：%s", item.full_name)
 
     def create_remove_list(self):
-        for sync_target in self.sync_task.sync_dirs.targets:
+        for sync_target in self.scaned_targets_dir:
             sync_target: SyncDir
-            self.create_remove_task(self.sync_task.sync_dirs.source, sync_target)
+            self.create_remove_task(
+                self.scaned_source_dir, sync_target)
             logger.info(
-                "[%s -> %s] 复制任务信息全部创建完成。",
-                self.sync_task.sync_dirs.source.base_path,
+                "[%s -> %s] 删除任务信息全部创建完成。",
+                self.scaned_source_dir.base_path,
                 sync_target.base_path
             )
 
     async def _remove_file(self, full_path):
         """"""
         res = await self.client.remove(
-            path=full_path.parent,
+            path=str(full_path.parent),
             names=[full_path.name, ]
         )
         if res.code == 200:
             self.sync_task.remove_tasks.get(str(full_path)).status = "removing"
 
     async def remove_files(self):
-        for path, item in self.sync_task.remove_tasks.items():
-            asyncio.create_task(self._remove_file(item.full_path))
+        tasks = [asyncio.create_task(self._remove_file(item.full_path))
+                 for path, item in self.sync_task.remove_tasks.items()]
+        await asyncio.gather(*tasks)

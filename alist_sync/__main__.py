@@ -13,7 +13,6 @@ from alist_sync.run_mirror import Mirror
 from alist_sync.run_sync import Sync
 from alist_sync.run_sync_incr import SyncIncr
 
-logging.basicConfig(level='INFO')
 app = Typer()
 
 
@@ -36,7 +35,7 @@ def copy(
                              password=password, token=token, verify=verify)
     echo(
         f"Will Be Copy '{source}' -> {target} on {alist_info.base_url} [{alist_info.username}]")
-    return CopyToTarget(alist_info, source_dir=source, target_path=target).run()
+    return CopyToTarget(alist_info, source_path=source, targets_path=target).run()
 
 
 @app.command('mirror')
@@ -59,7 +58,7 @@ def mirror(
     echo(f"Will Be Mirror '{source}' -> {target} "
          f"on {alist_info.base_url} [{alist_info.username}]"
          )
-    return Mirror(alist_info, source_dir=source, target_path=target).run()
+    return Mirror(alist_info, source_path=source, targets_path=target).run()
 
 
 @app.command()
@@ -111,4 +110,11 @@ def sync_incr(
 
 
 if __name__ == '__main__':
+    # logging.basicConfig(level='INFO')
+    logger = logging.getLogger('alist-sync')
+    hander = logging.StreamHandler()
+    hander.setLevel("DEBUG")
+    # hander.setFormatter("")
+    logger.addHandler(hander)
+    logger.setLevel("DEBUG")
     app()

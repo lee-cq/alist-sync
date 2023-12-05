@@ -59,10 +59,23 @@ class CopyToTarget(SyncBase):
             logger.debug("[%s -> %s] %s: 已创建复制任务信息。",
                          source.base_path, target.base_path, copy_path)
 
-    async def create_copy_list(self):
-        source = self.sync_task.sync_dirs.get(self.source_path)
+    @property
+    def scaned_source_dir(self) -> SyncDir:
+        _s = self.sync_task.sync_dirs.get(self.source_path)
+        if _s is None:
+            raise  # TODO
+        return _s
 
-        for sync_target in (self.sync_task.sync_dirs.get(t) for t in self.targets_path):
+    @property
+    def scaned_targets_dir(self) -> list[SyncDir]:
+        _ts = [self.sync_task.sync_dirs.get(t) for t in self.targets_path]
+        if _ts:
+            return _ts
+        raise  # TODO
+
+    async def create_copy_list(self):
+
+        for sync_target in self.scaned_targets_dir:
             sync_target: SyncDir
             self.create_copy_task(
                 self.sync_task.sync_dirs.get(self.source_path),
@@ -70,7 +83,7 @@ class CopyToTarget(SyncBase):
             )
             logger.info(
                 "[%s -> %s] 复制任务信息全部创建完成。",
-                source.base_path,
+                self.scaned_source_dir.base_path,
                 sync_target.base_path
             )
 
