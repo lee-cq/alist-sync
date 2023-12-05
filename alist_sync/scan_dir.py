@@ -56,6 +56,7 @@ class ScanDir:
                 )
             else:
                 self.itme_list.append(item)
+                logger.debug("find: %s", item.full_name)
 
 
 async def scan_dir(client: AlistClient, scan_path) -> SyncDir:

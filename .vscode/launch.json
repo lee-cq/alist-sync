@@ -18,9 +18,9 @@
                 "-p",
                 "123456",
                 "-s",
-                "/onedrive/手机壁纸",
+                "/local",
                 "-t",
-                "/local"
+                "/local_dst"
             ]
         }
     ]

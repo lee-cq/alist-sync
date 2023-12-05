@@ -2,7 +2,13 @@
 import pytest
 import asyncio
 
+from pydantic import BaseModel
+
 from alist_sync import common
+
+
+class Task(BaseModel):
+    status: str = 'init'
 
 
 def test_hash():
@@ -15,3 +21,19 @@ def test_asyncio_all_task_name():
         assert 'sleep2' in common.async_all_task_names()
 
     asyncio.run(_test())
+
+
+@pytest.mark.parametrize(
+    "tasks, status, desp",
+    [
+        pytest.param([Task(status='success'),], True, "list-success"),
+        pytest.param({'name': Task(status='success'), }, True, 'dict-success'),
+        pytest.param([], True, 'list-[]'),
+
+        pytest.param([Task(status='success'), Task(status='running'),],
+                     False, 'list-running'),
+        pytest.param([Task()], False, 'list-[init]'),
+    ]
+)
+def test_is_task_all_success(tasks, status, desp):
+    assert common.is_task_all_success(tasks) == status, desp

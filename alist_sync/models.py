@@ -18,6 +18,8 @@ class AlistServer(BaseModel):
     token: Optional[str] = None
     has_opt: Optional[bool] = False
 
+    max_connect: int = 30  # 最大同时连接数
+
     # httpx 的参数
     verify: Optional[bool] = True
     headers: Optional[dict] = None
@@ -28,7 +30,7 @@ class SyncDir(BaseModel):
     base_path: str  # 同步基础目录
     items: list[Item]  # Item列表
 
-    items_relative: Optional[list] = Field(exclude=True)  # Item列表相对路径
+    items_relative: Optional[list] = Field([], exclude=True)  # Item列表相对路径
 
     def in_items(self, path) -> bool:
         """判断path是否在items中"""
@@ -95,21 +97,10 @@ class RemoveTask(BaseModel):
     status: str = 'init'
 
 
-class SyncDirs(BaseModel):
-    source: Optional[SyncDir] = None
-    targets: set[SyncDir] = {}
-
-    @property
-    def syncs(self) -> set[SyncDir]:
-        if isinstance(self.source, SyncDir):
-            return self.targets ^ {self.source, }
-        return self.targets
-
-
 class SyncTask(BaseModel):
     """同步任务"""
     alist_info: AlistServer  # Alist Info
-    sync_dirs: SyncDirs  # 同步目录
+    sync_dirs: dict[str, SyncDir] = {}  # 同步目录
     copy_tasks: dict[str, CopyTask] = {}  # 复制目录
     remove_tasks: dict[str, RemoveTask] = {}  # 删除目录
 

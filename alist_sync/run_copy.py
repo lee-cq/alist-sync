@@ -1,16 +1,24 @@
 import asyncio
 import logging
+import os
 from pathlib import PurePosixPath
 
 from alist_sdk import Item, Task
 
 from .base_sync import SyncBase
-from .models import SyncDir, CopyTask
+from .models import AlistServer, SyncDir, CopyTask
 
 logger = logging.getLogger("alist-sync.copy-to-target")
 
 
 class CopyToTarget(SyncBase):
+
+    def __init__(self, alist_info: AlistServer, source_path: str, targets_path: list[str]):
+        self.mode = 'copy'
+        self.source_path = source_path
+        self.targets_path = targets_path
+
+        super().__init__(alist_info, [source_path, *targets_path])
 
     async def async_run(self):
         """异步运行"""
@@ -52,13 +60,17 @@ class CopyToTarget(SyncBase):
                          source.base_path, target.base_path, copy_path)
 
     async def create_copy_list(self):
+        source = self.sync_task.sync_dirs.get(self.source_path)
 
-        for sync_target in self.sync_task.sync_dirs.targets:
+        for sync_target in (self.sync_task.sync_dirs.get(t) for t in self.targets_path):
             sync_target: SyncDir
-            self.create_copy_task(self.sync_task.sync_dirs.source, sync_target)
+            self.create_copy_task(
+                self.sync_task.sync_dirs.get(self.source_path),
+                sync_target
+            )
             logger.info(
                 "[%s -> %s] 复制任务信息全部创建完成。",
-                self.sync_task.sync_dirs.source.base_path,
+                source.base_path,
                 sync_target.base_path
             )
 
@@ -98,7 +110,6 @@ class CopyToTarget(SyncBase):
 
         await self.check_status()
         logger.info("复制完成。")
-        self.sync_task_cache_file.unlink(missing_ok=True)
 
     async def check_status(self):
         """状态更新"""

@@ -1,3 +1,4 @@
+import os
 import logging
 import asyncio
 
@@ -5,7 +6,7 @@ from .alist_client import AlistClient
 from .config import cache_dir
 from .models import SyncTask, AlistServer
 from .scan_dir import scan_dir
-from .common import sha1_6
+from .common import sha1_6, is_task_all_success
 
 logger = logging.getLogger("alist-sync.base")
 
@@ -14,27 +15,17 @@ class SyncBase:
 
     def __init__(self,
                  alist_info: AlistServer,
-                 mode: str = 'copy',
-                 source_dir: str = None,
-                 target_path: list[str] = []
+                 sync_dirs: list[str | os.PathLike]
                  ):
-        self.mode = mode
         self.client = AlistClient(timeout=30, **alist_info.model_dump())
-        self.target_path = target_path
-        self.source_dir = source_dir
-        target_path.sort()
+        self.sync_dirs = sync_dirs
+        self.sync_dirs.sort()
+
         self.sync_task_cache_file = cache_dir.joinpath(
-            f"sync_task_{sha1_6(source_dir)}_{sha1_6(target_path)}.json"
+            f"sync_task_{sha1_6(self.sync_dirs)}.json"
         )
-        logger.info("缓存文件名: %s -> %s : %s .",
-                    source_dir,
-                    target_path,
-                    self.sync_task_cache_file
-                    )
         self.sync_task = SyncTask(
             alist_info=alist_info,
-            sync_dirs=[],
-            copy_tasks={}
         )
         self.load_from_cache()
 
@@ -51,17 +42,27 @@ class SyncBase:
             self.sync_task.model_dump_json(indent=2)
         )
 
+    def clear_cache(self, force=False):
+        """清除缓存"""
+        if force:
+            self.sync_task_cache_file.unlink(missing_ok=True)
+        if all(is_task_all_success(self.sync_task.copy_tasks),
+               is_task_all_success(self.sync_task.remove_tasks)
+               ):
+            self.sync_task_cache_file.unlink(missing_ok=True)
+
     async def scans(self):
         """扫描目录"""
 
         async def scan(path):
-            self.sync_task.sync_dirs.append(
-                await scan_dir(self.client, path)
+            self.sync_task.sync_dirs.setdefault(
+                path, await scan_dir(self.client, path)
             )
 
-        for sync_dir in [self.source_dir, *self.target_path]:
+        for sync_dir in self.sync_dirs:
             asyncio.create_task(
-                scan(sync_dir), name=f"{id(self)}_scan_{sync_dir}")
+                scan(sync_dir), name=f"{id(self)}_scan_{sync_dir}"
+            )
 
         while True:
             await asyncio.sleep(1)
@@ -74,9 +75,9 @@ class SyncBase:
         asyncio.run(self.async_run())
 
     async def async_run(self):
-        if not self.sync_task.sync_dirs.syncs:
+        if not self.sync_task.sync_dirs.values():
             await self.scans()
             self.save_to_cache()
         else:
             logger.info(f"一件从缓存中找到 %d 个 SyncDir",
-                        len(self.sync_task.sync_dirs.syncs))
+                        len(self.sync_task.sync_dirs))
