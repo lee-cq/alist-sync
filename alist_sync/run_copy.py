@@ -25,7 +25,7 @@ class CopyToTarget(SyncBase):
 
         # 创建复制列表
         if not self.sync_task.copy_tasks:
-            await self.create_copy_list()
+            self.create_copy_list()
             self.save_to_cache()
         else:
             logger.info(f"一件从缓存中找到 %d 个 CopyTask",
@@ -62,22 +62,22 @@ class CopyToTarget(SyncBase):
                          source.base_path, target.base_path, copy_path)
 
     @property
-    def scaned_source_dir(self) -> SyncDir:
+    def scanned_source_dir(self) -> SyncDir:
         _s = self.sync_task.sync_dirs.get(self.source_path)
         if _s is None:
             raise  # TODO
         return _s
 
     @property
-    def scaned_targets_dir(self) -> list[SyncDir]:
+    def scanned_targets_dir(self) -> list[SyncDir]:
         _ts = [self.sync_task.sync_dirs.get(t) for t in self.targets_path]
         if _ts:
             return _ts
         raise  # TODO
 
-    async def create_copy_list(self):
+    def create_copy_list(self):
 
-        for sync_target in self.scaned_targets_dir:
+        for sync_target in self.scanned_targets_dir:
             sync_target: SyncDir
             self.create_copy_task(
                 self.sync_task.sync_dirs.get(self.source_path),
@@ -85,7 +85,7 @@ class CopyToTarget(SyncBase):
             )
             logger.info(
                 "[%s -> %s] 复制任务信息全部创建完成。",
-                self.scaned_source_dir.base_path,
+                self.scanned_source_dir.base_path,
                 sync_target.base_path
             )
 

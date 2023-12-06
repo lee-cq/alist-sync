@@ -31,7 +31,17 @@ class Mirror(CopyToTarget):
                          targets_path=targets_path)
 
     async def async_run(self):
-        await super().async_run()
+        await super(CopyToTarget).async_run()
+        # 创建复制列表
+        if not self.sync_task.copy_tasks:
+            self.create_copy_list()
+            self.save_to_cache()
+        else:
+            logger.info(f"一件从缓存中找到 %d 个 CopyTask",
+                        len(self.sync_task.copy_tasks))
+
+        # 复制文件
+        asyncio.create_task(self.copy_files(), name="copy_files")
 
         # 创建删除列表
         if not self.sync_task.remove_tasks:
@@ -43,9 +53,10 @@ class Mirror(CopyToTarget):
             logger.info(
                 f"一件从缓存中找到 %d 个 RemoveTask", len(self.sync_task.remove_tasks)
             )
+        await self.remove_files()  # 删除文件
 
-        # 删除文件
-        await self.remove_files()
+        await self.check_status()
+        logger.info("复制完成。")
 
     def create_remove_task(self, source_dir: SyncDir, target_dir: SyncDir):
         """source无，删除target中有的"""
@@ -67,13 +78,13 @@ class Mirror(CopyToTarget):
             logger.info("添加RemoveTask：%s", item.full_name)
 
     def create_remove_list(self):
-        for sync_target in self.scaned_targets_dir:
+        for sync_target in self.scanned_targets_dir:
             sync_target: SyncDir
             self.create_remove_task(
-                self.scaned_source_dir, sync_target)
+                self.scanned_source_dir, sync_target)
             logger.info(
                 "[%s -> %s] 删除任务信息全部创建完成。",
-                self.scaned_source_dir.base_path,
+                self.scanned_source_dir.base_path,
                 sync_target.base_path
             )
 
