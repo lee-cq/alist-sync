@@ -1,4 +1,5 @@
 import datetime
+import json
 from pathlib import PurePosixPath, Path
 from typing import Optional
 
@@ -19,10 +20,44 @@ class AlistServer(BaseModel):
     has_opt: Optional[bool] = False
 
     max_connect: int = 30  # 最大同时连接数
+    storage_config: Path = []
 
     # httpx 的参数
     verify: Optional[bool] = True
     headers: Optional[dict] = None
+
+    def storages(self) -> list[dict]:
+        """返回给定的 storage_config 中包含的storages"""
+
+        def is_storage(_st):
+            if not isinstance(_st, dict):
+                return False
+            if 'mount_path' in _st and 'driver' in _st:
+                return True
+            return False
+
+        if not self.storage_config:
+            return []
+        if not self.storage_config.exists():
+            raise FileNotFoundError(f"找不到文件：{self.storage_config}")
+
+        _load_storages = json.load(self.storage_config.open())
+        if isinstance(_load_storages, list):
+            _load_storages = [_s for _s in _load_storages if is_storage()]
+            if _load_storages:
+                return _load_storages
+            raise KeyError()
+
+        if isinstance(_load_storages, dict):
+            if 'storages' in _load_storages:
+                _load_storages = [
+                    _s for _s in _load_storages['storages'] if is_storage()]
+                if _load_storages:
+                    return _load_storages
+                raise KeyError()
+            if is_storage(_load_storages):
+                return [_load_storages, ]
+            raise KeyError("给定的")
 
 
 class SyncDir(BaseModel):

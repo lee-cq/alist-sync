@@ -2,11 +2,13 @@ import asyncio
 import hashlib
 
 import logging
+import selectors
+import sys
 
 logger = logging.getLogger("alist-sync.common")
 
 __all__ = [
-    "sha1", "sha1_6", "async_all_task_names", "is_task_all_success"
+    "sha1", "sha1_6", "async_all_task_names", "is_task_all_success", "timeout_input"
 ]
 
 
@@ -31,6 +33,20 @@ def is_task_all_success(tasks: list | dict) -> bool:
     if isinstance(tasks, dict):
         tasks = tasks.values()
     return all(1 if i.status == 'success' else 0 for i in tasks)
+
+
+def timeout_input(msg, default, timeout=3):
+    sys.stdout.write(msg)
+    sys.stdout.flush()
+    sel = selectors.DefaultSelector()
+    sel.register(sys.stdin, selectors.EVENT_READ)
+    events = sel.select(timeout)
+    if events:
+        key, _ = events[0]
+        return key.fileobj.readline().rstrip()
+    else:
+        sys.stdout.write('\n')
+        return default
 
 
 if __name__ == "__main__":

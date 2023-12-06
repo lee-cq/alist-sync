@@ -1,6 +1,6 @@
 #!/bin/env python3
 # coding: utf8
-
+import os
 import logging
 from pathlib import Path
 
@@ -15,46 +15,85 @@ from alist_sync.run_sync_incr import SyncIncr
 
 app = Typer()
 
+_base_url: str = Option(
+    'http://localhost:5244', '--host', '-h',
+    help="Base URL for Alist Host",
+)
+
+_username: str = Option(
+    '', "--username", "-u",
+    help="Alist Admin Username"
+)
+
+_passwprd: str = Option(
+    '', "--password", "-p",
+    help="Alist Admin Password"
+)
+
+_token: str = Option(
+    '', "--token", "-t",
+    help="Alist Admin Token"
+)
+
+_verify: bool = Option(
+    True, "--verify", "-v",
+    help="Verify SSL Certificates"
+)
+
+_stores_config: str = Option(
+    ..., '-c', '--store-path',
+    help="一个包含存储配置的JSON文件，可以是AList的备份文件"
+)
+
 
 @app.command()
 def copy(
-        base_url: str = Option('http://localhost:5244',
-                               '--host', '-h', help="Base URL for Alist Host", ),
-        username: str = Option('', "--username", "-u",
-                               help="Alist Admin Username"),
-        password: str = Option('', "--password", "-p",
-                               help="Alist Admin Password"),
-        token: str = Option('', "--token", "-t", help="Alist Admin Token"),
-        verify: bool = Option(True, "--verify", "-v",
-                              help="Verify SSL Certificates"),
+        base_url: str = _base_url,
+        username: str = _username,
+        password: str = _passwprd,
+        token: str = _token,
+        verify: bool = _verify,
+        storage_config: str = _stores_config,
         source: str = Option(..., "--source", "-s", help="Source Path"),
         target: list[str] = Option(..., "--target", "-t", help="Target Path"),
 ):
     """复制任务"""
-    alist_info = AlistServer(base_url=base_url, username=username,
-                             password=password, token=token, verify=verify)
+    alist_info = AlistServer(
+        base_url=base_url,
+        username=username,
+        password=password,
+        token=token,
+        verify=verify,
+        storage_config=storage_config,
+    )
     echo(
-        f"Will Be Copy '{source}' -> {target} on {alist_info.base_url} [{alist_info.username}]")
+        f"Will Be Copy '{source}' -> {target} "
+        "on {alist_info.base_url} [{alist_info.username}]"
+    )
     return CopyToTarget(alist_info, source_path=source, targets_path=target).run()
 
 
 @app.command('mirror')
 def mirror(
-        base_url: str = Option('http://localhost:5244',
-                               '--host', '-h', help="Base URL for Alist Host", ),
-        username: str = Option('', "--username", "-u",
-                               help="Alist Admin Username"),
-        password: str = Option('', "--password", "-p",
-                               help="Alist Admin Password"),
-        token: str = Option('', "--token", "-t", help="Alist Admin Token"),
-        verify: bool = Option(True, "--verify", "-v",
-                              help="Verify SSL Certificates"),
+        base_url: str = _base_url,
+        username: str = _username,
+        password: str = _passwprd,
+        token: str = _token,
+        verify: bool = _verify,
+        storage_config: str = _stores_config,
+
         source: str = Option(..., "--source", "-s", help="Source Path"),
         target: list[str] = Option(..., "--target", "-t", help="Target Path"),
 ):
     """镜像"""
-    alist_info = AlistServer(base_url=base_url, username=username,
-                             password=password, token=token, verify=verify)
+    alist_info = AlistServer(
+        base_url=base_url,
+        username=username,
+        password=password,
+        token=token,
+        verify=verify,
+        storage_config=storage_config,
+    )
     echo(f"Will Be Mirror '{source}' -> {target} "
          f"on {alist_info.base_url} [{alist_info.username}]"
          )
@@ -63,20 +102,23 @@ def mirror(
 
 @app.command()
 def sync(
-        base_url: str = Option('http://localhost:5244',
-                               '--host', '-h', help="Alist Host", ),
-        username: str = Option('', "--username", "-u",
-                               help="Alist Admin Username"),
-        password: str = Option('', "--password", "-p",
-                               help="Alist Admin Password"),
-        token: str = Option('', "--token", "-t", help="Alist Admin Token"),
-        verify: bool = Option(True, "--verify", "-v",
-                              help="Verify SSL Certificates"),
+        base_url: str = _base_url,
+        username: str = _username,
+        password: str = _passwprd,
+        token: str = _token,
+        verify: bool = _verify,
+        storage_config: str = _stores_config,
         sync_group: list[str] = Option(..., "--sync", "-s", help="Sync Group"),
 ):
     """同步任务"""
-    alist_info = AlistServer(base_url=base_url, username=username,
-                             password=password, token=token, verify=verify)
+    alist_info = AlistServer(
+        base_url=base_url,
+        username=username,
+        password=password,
+        token=token,
+        verify=verify,
+        storage_config=storage_config,
+    )
     echo(style("Hello Sync", fg="green", bg="black", bold=True))
     return Sync(alist_info, sync_group)
 
@@ -85,21 +127,24 @@ def sync(
 def sync_incr(
         config_dir: str = Option(..., "--name", "-n", help="在Alist上存储的配置目录"),
         cache_dir: str = Option(Path(), "--cache-dir", "-c", help="配置缓存目录"),
-        base_url: str = Option('http://localhost:5244',
-                               '--host', '-h', help="Alist Host", ),
-        username: str = Option('', "--username", "-u",
-                               help="Alist Admin Username"),
-        password: str = Option('', "--password", "-p",
-                               help="Alist Admin Password"),
-        token: str = Option('', "--token", "-t", help="Alist Admin Token"),
-        verify: bool = Option(True, "--verify", "-v",
-                              help="Verify SSL Certificates"),
+        base_url: str = _base_url,
+        username: str = _username,
+        password: str = _passwprd,
+        token: str = _token,
+        verify: bool = _verify,
+        storage_config: str = _stores_config,
         sync_group: list[str] = Option(..., "--sync", "-s", help="Sync Group"),
 
 ):
     """增量同步"""
-    alist_info = AlistServer(base_url=base_url, username=username,
-                             password=password, token=token, verify=verify)
+    alist_info = AlistServer(
+        base_url=base_url,
+        username=username,
+        password=password,
+        token=token,
+        verify=verify,
+        storage_config=storage_config,
+    )
     echo(f"增量同步：{sync_group}")
     return SyncIncr(
         alist_info,

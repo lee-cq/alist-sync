@@ -6,7 +6,7 @@ from .alist_client import AlistClient
 from .config import cache_dir
 from .models import SyncTask, AlistServer
 from .scan_dir import scan_dir
-from .common import sha1_6, is_task_all_success
+from .common import sha1_6, is_task_all_success, timeout_input
 
 logger = logging.getLogger("alist-sync.base")
 
@@ -17,7 +17,10 @@ class SyncBase:
                  alist_info: AlistServer,
                  sync_dirs: list[str | os.PathLike]
                  ):
-        self.client = AlistClient(timeout=30, **alist_info.model_dump())
+        self.client = AlistClient(
+            timeout=30, **alist_info.model_dump(exclude='storage_config')
+        )
+
         self.sync_dirs = sync_dirs
         self.sync_dirs.sort()
 
@@ -30,7 +33,7 @@ class SyncBase:
         self.load_from_cache()
 
     def __del__(self):
-        asyncio.gather(self.client.aclose())
+        self.client.close()
         self.save_to_cache()
         self.clear_cache()
 
@@ -56,6 +59,22 @@ class SyncBase:
                 )):
             self.sync_task_cache_file.unlink(missing_ok=True)
 
+    async def create_storages(self, storages):
+        """创建后端存储"""
+        mounted_storages = [s.mount_path for s in (await self.client.storage_list()).data.content]
+        for st in storages:
+            if st['mount_path'] in mounted_storages:
+                logger.error("Mount_Path重复，可能会造成错误：%s", st['mount_path'])
+                if timeout_input("3s内觉得是否继续 (y/N):", default='N').upper() != "Y":
+                    raise
+                continue
+            res = await self.client.storage_create(st)
+            if res.code == 200:
+                logger.info("创建存储成功: %s, id=%s", st['mount_path'], res.data.id)
+            else:
+                raise Exception(f"创建存储失败：%s, message: %s",
+                                st['mount_path'], res.message)
+
     async def scans(self):
         """扫描目录"""
 
@@ -80,6 +99,7 @@ class SyncBase:
         asyncio.run(self.async_run())
 
     async def async_run(self):
+        await self.create_storages(self.sync_task.alist_info.storages())
         if not self.sync_task.sync_dirs.values():
             await self.scans()
             self.save_to_cache()
