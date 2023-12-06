@@ -6,6 +6,7 @@ from alist_sdk import Item, Task
 
 from .base_sync import SyncBase
 from .models import AlistServer, SyncDir, CopyTask
+from .common import async_all_task_names
 
 logger = logging.getLogger("alist-sync.copy-to-target")
 
@@ -109,10 +110,14 @@ class CopyToTarget(SyncBase):
                 ]
                 if not _need_create_copy:
                     logger.info("全部复制任务已经创建，create_copy exited.")
-                    self.client.task_clear_done('copy')
                     break
+
                 for copy_task in _need_create_copy:
                     copy_task: CopyTask
+                    name = f"{id(self)}_copy_{copy_task.name}"
+                    if name in async_all_task_names():
+                        await asyncio.sleep(5)
+                        break
                     asyncio.create_task(
                         copy(
                             copy_task,
@@ -120,7 +125,7 @@ class CopyToTarget(SyncBase):
                             dst_dir=copy_task.copy_target.as_posix(),
                             files=[copy_task.copy_name, ]
                         ),
-                        name=f"{id(self)}_copy_{copy_task.copy_name}"
+                        name=name
                     )
                 await asyncio.sleep(5)
 
@@ -134,7 +139,8 @@ class CopyToTarget(SyncBase):
 
     def status_getting_src(self, task: Task):
         if self.sync_task.copy_tasks[task.name].status in ['created', 'waiting']:
-            logger.debug("[%s] 正在下载源数据内容 %.2f %% ...", task.name, task.progress)
+            logger.debug("[%s] 正在下载源数据内容 %.2f %% ...",
+                         task.name, task.progress)
             self.sync_task.copy_tasks[task.name].status = 'getting_src'
 
     def status_failed(self, task: Task):
@@ -158,36 +164,40 @@ class CopyToTarget(SyncBase):
             "failed": self.status_failed,
             "success": self.status_success
         }
+
         while True:
             await asyncio.sleep(1)
             _, task_done = self.client.cached_copy_task_done
-
             _last_time, task_undone = self.client.cached_copy_task_undone
             _unsuccessful_task = [
                 t for t in self.sync_task.copy_tasks.values() if t.status != "success"
             ]
             if not _unsuccessful_task:
                 logger.info("全部的复制任务已经完成。")
+                self.client.task_clear_done('copy')
                 return
             if _last_time == 0:
+                logger.debug("Cache Task 尚未启动 .")
                 continue
 
-            logger.info(f"等待复制完成, 剩余 %d ...", len(task_undone.data))
+            if len(task_undone) == 0:
+                return  # FIXME Alist api 3.39.1 没有返回完成的标志
 
-            for name, copy_task in _unsuccessful_task:
+            logger.info(f"等待复制完成, 剩余 %d ...", len(task_undone))
+
+            for copy_task in _unsuccessful_task:
                 copy_task: CopyTask
-                ts = [
-                    t for t in [*task_done, *task_undone] if t.name == copy_task.copy_name
+                tasks = [
+                    t for t in [*task_done, *task_undone] if t.name == copy_task.name
                 ]
-                for t in ts:
-                    if t.name not in self.sync_task.copy_tasks:
+                for task in tasks:
+                    if task.name not in self.sync_task.copy_tasks:
                         continue
 
-                    ct: CopyTask = self.sync_task.copy_tasks.get(name)
-                    if ct.id is None:
-                        ct.id = t.id
+                    if copy_task.id is None:
+                        copy_task.id = task.id
 
                     try:
-                        status[t.status](t)
+                        status[task.status](task)
                     except KeyError:
-                        logger.error(f"Task Status 未定义： {t.status = }")
+                        logger.error(f"Task Status 未定义： {task.status = }")

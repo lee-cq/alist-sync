@@ -31,7 +31,7 @@ class Mirror(CopyToTarget):
                          targets_path=targets_path)
 
     async def async_run(self):
-        await super(CopyToTarget).async_run()
+        await super(CopyToTarget, self).async_run()
         # 创建复制列表
         if not self.sync_task.copy_tasks:
             self.create_copy_list()

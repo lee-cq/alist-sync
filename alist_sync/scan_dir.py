@@ -35,7 +35,8 @@ class ScanDir:
         """列出目录"""
         res = await self.client.list_files(path, refresh=True)
         if res.code != 200:
-            logger.warning("扫描目录异常：[code: %d] %s", res.code, res.message)
+            logger.warning("扫描目录异常: %s [code: %d] %s",
+                           path, res.code, res.message)
             if retry:
                 return await self.list_files(path=path, retry=retry - 1)
             exit(1)
