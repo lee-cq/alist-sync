@@ -20,8 +20,14 @@ class AlistClient(_AsyncClient):
 
     def __init__(self, base_url, max_connect=30, *,
                  token=None, username=None, password=None, has_opt=False, **kwargs):
-        super().__init__(base_url, token, username=username, password=password, has_opt=has_opt, **kwargs)
+        super().__init__(
+            base_url, token, username=username,
+            password=password, has_opt=has_opt, **kwargs)
         self._max_connect = asyncio.Semaphore(max_connect)
+        self.__closed = False
+
+    def close(self):
+        self.__closed = True
 
     def set_mex_connect(self, max_connect):
         """"""
@@ -35,7 +41,7 @@ class AlistClient(_AsyncClient):
         wait_time = 0.01
         while True:
             await asyncio.sleep(wait_time)
-            if self.is_closed:
+            if self.__closed:
                 break
             res = await self.__getattribute__(attr_name)(task_type)
             if res.code == 200:
@@ -61,6 +67,8 @@ class AlistClient(_AsyncClient):
                 self._cache('task_done', 'copy'),
                 name='cached_copy_task_done'
             )
+            logger.info("cached_copy_task_done 已经创建 ")
+
         return TaskStat.copy_task_done
 
     @property
@@ -69,9 +77,10 @@ class AlistClient(_AsyncClient):
 
         :return 更新时间, {task_name, Task, ...}
         """
-        if "cached_copy_task_done" not in async_all_task_names():
+        if "cached_copy_task_undone" not in async_all_task_names():
             asyncio.create_task(
                 self._cache('task_undone', 'copy'),
-                name='cached_copy_task_done'
+                name='cached_copy_task_undone'
             )
-        return TaskStat.copy_task_undone
+            logger.info("cached_copy_task_undone 已经创建 ")
+        return getattr(TaskStat, f"copy_task_undone",)
