@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "debug - copy",
+            "name": "CLI - main copy",
             "type": "python",
             "request": "launch",
             "program": "alist_sync/__main__.py",
@@ -17,11 +17,21 @@
                 "admin",
                 "-p",
                 "123456",
+                "-c", "/home/runner/alist-sync/storage.json", 
                 "-s",
-                "/local",
+                "/onedrive/Music",
                 "-t",
-                "/local_dst"
+                "/local_dst/"
             ]
+        }, 
+        {
+            "name": "debug - copy",
+            "type": "python",
+            "request": "launch",
+            "program": "tests/debugger.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+
         }
     ]
 }
