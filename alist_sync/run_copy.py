@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from pathlib import PurePosixPath
 
 from alist_sdk import Item, Task
@@ -33,7 +32,10 @@ class CopyToTarget(SyncBase):
                         len(self.sync_task.copy_tasks))
 
         # 复制文件
-        await self.copy_files()
+        asyncio.create_task(self.copy_files(), name="copy_files")
+
+        await self.check_status()
+        logger.info("复制完成。")
 
     def create_copy_task(self, source: SyncDir, target: SyncDir):
         """通过比对源与目标到差异，创建复制列表"""
@@ -102,12 +104,15 @@ class CopyToTarget(SyncBase):
 
         async def create_copy():
             while True:
-                if not self.sync_task.copy_tasks:
+                _need_create_copy = [
+                    ct for ct in self.sync_task.copy_tasks.values() if ct.status == 'init'
+                ]
+                if not _need_create_copy:
+                    logger.info("全部复制任务已经创建，create_copy exited.")
+                    self.client.task_clear_done('copy')
                     break
-                for copy_task in self.sync_task.copy_tasks.values():
+                for copy_task in _need_create_copy:
                     copy_task: CopyTask
-                    if copy_task.status != 'init':
-                        continue
                     asyncio.create_task(
                         copy(
                             copy_task,
@@ -121,38 +126,68 @@ class CopyToTarget(SyncBase):
 
         asyncio.create_task(create_copy())
 
-        await self.check_status()
-        logger.info("复制完成。")
+    def status_wait(self, task: Task):
+        """等待状态"""
+        if self.sync_task.copy_tasks[task.name].status in ['created', ]:
+            logger.debug("[%s] 在等待排队")
+            self.sync_task.copy_tasks[task.name].status = 'waiting'
+
+    def status_getting_src(self, task: Task):
+        if self.sync_task.copy_tasks[task.name].status in ['created', 'waiting']:
+            logger.debug("[%s] 正在下载源数据内容 %.2f %% ...", task.name, task.progress)
+            self.sync_task.copy_tasks[task.name].status = 'getting_src'
+
+    def status_failed(self, task: Task):
+        logger.warning("[%s] 复制失败：error: %s", task.name, task.error)
+        self.sync_task.copy_tasks[task.name].status = 'failed'
+
+    def status_success(self, task: Task):
+        logger.info("[%s] 复制完成。", task.name)
+        self.sync_task.copy_tasks[task.name].status = 'success'
+
+    def _not_de_status(self, task: Task):
+        pass
 
     async def check_status(self):
         """状态更新"""
+
+        status = {
+            #
+            "": self.status_wait,
+            "getting src object": self.status_getting_src,
+            "failed": self.status_failed,
+            "success": self.status_success
+        }
         while True:
             await asyncio.sleep(1)
-            task_done = await self.client.task_done('copy')
-            await self.client.task_clear_done('copy')
-            task_undone = await self.client.task_undone('copy')
-            if not task_undone.data:
-                break
+            _, task_done = self.client.cached_copy_task_done
+
+            _last_time, task_undone = self.client.cached_copy_task_undone
+            _unsuccessful_task = [
+                t for t in self.sync_task.copy_tasks.values() if t.status != "success"
+            ]
+            if not _unsuccessful_task:
+                logger.info("全部的复制任务已经完成。")
+                return
+            if _last_time == 0:
+                continue
+
             logger.info(f"等待复制完成, 剩余 %d ...", len(task_undone.data))
 
-            for t in task_done.data or []:
-                t: Task
-                if t.name not in self.sync_task.copy_tasks:
-                    continue
-                if t.status == "":
-                    logger.info("[%s] 复制任务已经完成。", t.name)
-                    self.sync_task.copy_tasks[t.name].status = 'success'
-                    self.sync_task.copy_tasks.pop(t.name)
-                    self.save_to_cache()
-                    continue
+            for name, copy_task in _unsuccessful_task:
+                copy_task: CopyTask
+                ts = [
+                    t for t in [*task_done, *task_undone] if t.name == copy_task.copy_name
+                ]
+                for t in ts:
+                    if t.name not in self.sync_task.copy_tasks:
+                        continue
 
-                if t.error:
-                    self.sync_task.copy_tasks[t.name].status = 'failed'
-                    self.sync_task.copy_tasks[t.name].message = t.error
-                    self.save_to_cache()
-                    continue
+                    ct: CopyTask = self.sync_task.copy_tasks.get(name)
+                    if ct.id is None:
+                        ct.id = t.id
 
-                if t.status == "getting src object":
-                    self.sync_task.copy_tasks[t.name].status = 'getting src object'
-                    self.save_to_cache()
-                    continue
+                    try:
+                        status[t.status](t)
+                    except KeyError:
+                        logger.error(f"Task Status 未定义： {t.status = }")

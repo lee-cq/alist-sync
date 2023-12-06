@@ -29,6 +29,11 @@ class SyncBase:
         )
         self.load_from_cache()
 
+    def __del__(self):
+        asyncio.gather(self.client.aclose())
+        self.save_to_cache()
+        self.clear_cache()
+
     def load_from_cache(self):
         """从缓存中加载"""
         if not self.sync_task_cache_file.exists():
@@ -46,9 +51,9 @@ class SyncBase:
         """清除缓存"""
         if force:
             self.sync_task_cache_file.unlink(missing_ok=True)
-        if all(is_task_all_success(self.sync_task.copy_tasks),
-               is_task_all_success(self.sync_task.remove_tasks)
-               ):
+        if all((is_task_all_success(self.sync_task.copy_tasks),
+                is_task_all_success(self.sync_task.remove_tasks)
+                )):
             self.sync_task_cache_file.unlink(missing_ok=True)
 
     async def scans(self):

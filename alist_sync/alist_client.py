@@ -12,8 +12,8 @@ __all__ = ["AlistClient"]
 
 
 class TaskStat:
-    copy_task_done = 0, {}
-    copy_task_undone = 0, {}
+    copy_task_done = 0, []
+    copy_task_undone = 0, []
 
 
 class AlistClient(_AsyncClient):
@@ -43,7 +43,7 @@ class AlistClient(_AsyncClient):
                     TaskStat, f"{task_type}_{attr_name}",
                     (
                         int(time.time()),
-                        {t.name: t for t in res.data}
+                        res.data or []
                     )
                 )
                 wait_time = 5
@@ -51,7 +51,7 @@ class AlistClient(_AsyncClient):
                 wait_time = 0.1
 
     @property
-    def cached_copy_task_done(self) -> tuple[int, dict[str, Task]]:
+    def cached_copy_task_done(self) -> tuple[int, list[Task]]:
         """
 
         :return 更新时间, {task_name, Task, ...}
@@ -64,7 +64,7 @@ class AlistClient(_AsyncClient):
         return TaskStat.copy_task_done
 
     @property
-    def cached_copy_task_undone(self) -> tuple[int, dict[str, Task]]:
+    def cached_copy_task_undone(self) -> tuple[int, list[Task]]:
         """
 
         :return 更新时间, {task_name, Task, ...}
