@@ -25,10 +25,12 @@ def create_storage_local(client_, mount_name, local_path: Path):
     if f'/{mount_name}' not in [
         i['mount_path'] for i in client_.get("/api/admin/storage/list").json()['data']['content']
     ]:
-        assert client_.post(
+        data = client_.post(
             "/api/admin/storage/create",
-            json=local_storage
-        ).json().get('code') == 200, "创建Storage失败。"
+            json=local_storage).json()
+        
+        assert data.get('code') == 200, data.get(
+            "message") + f", {mount_name = }"
     else:
         print("已经创建，跳过 ...")
 
@@ -42,4 +44,3 @@ def clear_dir(path: Path):
         else:
             item.unlink()
     path.rmdir()
-

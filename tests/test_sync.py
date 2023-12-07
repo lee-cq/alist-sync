@@ -22,7 +22,7 @@ DATA_DIR_DST2 = WORKDIR / "alist/test_dir_dst2"
 
 def setup_module():
     print("setup_module")
-    os.system(f'bash {WORKDIR}/init_alist.sh')
+    assert os.system(f'bash {WORKDIR}/init_alist.sh') == 0
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR_DST.mkdir(parents=True, exist_ok=True)
     DATA_DIR_DST2.mkdir(parents=True, exist_ok=True)

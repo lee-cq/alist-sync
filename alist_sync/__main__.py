@@ -7,6 +7,7 @@ from typer import Typer, Option, echo, style
 
 from alist_sync.models import AlistServer
 
+from alist_sync.base_sync import SyncBase
 from alist_sync.run_copy import CopyToTarget
 from alist_sync.run_mirror import Mirror
 from alist_sync.run_sync import Sync
@@ -44,8 +45,34 @@ _stores_config: str = Option(
     help="一个包含存储配置的JSON文件，可以是AList的备份文件"
 )
 
+@app.command(name='check')
+def check(
+        base_url: str = _base_url,
+        username: str = _username,
+        password: str = _password,
+        token: str = _token,
+        verify: bool = _verify,
+        storage_config: str = _stores_config,
+        target: list[str] = Option(..., "--target", "-t", help="Check Path"),
+):
+    """检查各个存储中的文件状态"""
+    alist_info = AlistServer(
+        base_url=base_url,
+        username=username,
+        password=password,
+        token=token,
+        verify=verify,
+        storage_config=storage_config,
+    )
+    echo(
+        f"Will Be Check {target} "
+        "on {alist_info.base_url} [{alist_info.username}]"
+    )
+    return SyncBase(alist_info=alist_info, sync_dirs=target).sync_task.checker.model_dump_table()
 
-@app.command()
+    
+
+@app.command(name="copy")
 def copy(
         base_url: str = _base_url,
         username: str = _username,

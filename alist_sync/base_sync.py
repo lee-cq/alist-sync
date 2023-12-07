@@ -4,7 +4,7 @@ import asyncio
 
 from alist_sync.alist_client import AlistClient
 from alist_sync.config import cache_dir
-from alist_sync.models import SyncTask, AlistServer
+from alist_sync.models import SyncTask, AlistServer, Checker
 from alist_sync.scan_dir import scan_dir
 from alist_sync.common import sha1_6, is_task_all_success, timeout_input
 
@@ -103,6 +103,7 @@ class SyncBase:
         if not self.sync_task.sync_dirs.values():
             await self.scans()
             self.save_to_cache()
+            self.sync_task.checker = Checker.checker(*self.sync_task.sync_dirs.values())
         else:
             logger.info(f"一件从缓存中找到 %d 个 SyncDir",
                         len(self.sync_task.sync_dirs))

@@ -5,8 +5,11 @@ cd "$(dirname "$0")" || exit
 mkdir -p alist
 cd alist || exit
 
+VERSION=${ALIST_VERSION:-"v3.29.1"}
+
 if [ ! -f alist ]; then
-    wget -q https://github.com/alist-org/alist/releases/download/v3.29.1/alist-linux-amd64.tar.gz
+    echo Will Install ${VERSION}
+    wget -q https://github.com/alist-org/alist/releases/download/${VERSION}/alist-linux-amd64.tar.gz
     tar xzvf alist-linux-amd64.tar.gz
 fi
 

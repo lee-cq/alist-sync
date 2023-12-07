@@ -1,16 +1,16 @@
 import datetime
 import json
 from pathlib import PurePosixPath, Path
-from typing import Optional, Literal
+from typing import  Optional, Literal
 
 from pydantic import BaseModel, computed_field, Field
 from alist_sdk import Item
 
 from alist_sync.alist_client import AlistClient
 
-__all__ = ["AlistServer", "SyncDir", "CopyTask", "RemoveTask", "SyncTask"]
+__all__ = ["AlistServer", "SyncDir", "CopyTask", "RemoveTask", "SyncTask", "Checker"]
 
-StatusModify = Literal["init", "created", ]
+CopyStatusModify = Literal["init", "created", "waitting","getting src object", "", "running", "seccess"]
 
 
 class AlistServer(BaseModel):
@@ -76,12 +76,6 @@ class SyncDir(BaseModel):
                 self.base_path) for i in self.items]
         return path in self.items_relative
 
-    # @field_serializer('items_relative')
-    # def serializer_items_relative(self, value, info) -> list:
-    #     value: list[PurePosixPath] = []
-    #     info: object
-    #     return value
-
 
 class CopyTask(BaseModel):
     """复制任务"""
@@ -90,13 +84,8 @@ class CopyTask(BaseModel):
     copy_source: PurePosixPath  # 需要复制的源文件夹
     copy_target: PurePosixPath  # 需要复制到的目标文件夹
     # 任务状态 init: 初始化，created: 已创建，"getting src object": 运行中，"": 已完成，"failed": 失败
-    status: str = "init"
+    status: CopyStatusModify = "init"
     message: Optional[str] = ''
-
-    # @field_serializer('copy_source', 'copy_target')
-    # def serializer_path(self, value: PurePosixPath, info):
-    #     return value.as_posix()
-
     @computed_field()
     @property
     def name(self) -> str:
@@ -138,6 +127,7 @@ class SyncTask(BaseModel):
     """同步任务"""
     alist_info: AlistServer  # Alist Info
     sync_dirs: dict[str, SyncDir] = {}  # 同步目录
+    checker: Optional['Checker'] = None
     copy_tasks: dict[str, CopyTask] = {}  # 复制目录
     remove_tasks: dict[str, RemoveTask] = {}  # 删除目录
 
@@ -154,17 +144,49 @@ class Config(BaseModel):
     create_time: datetime.datetime
 
 
-if __name__ == '__main__':
-    print(
-        SyncTask(
-            alist_info=AlistServer(),
-            sync_dirs=[],
-            copy_tasks={
-                'aa': CopyTask(
-                    copy_name='aa',
-                    copy_source=PurePosixPath('/a'),
-                    copy_target=PurePosixPath('/b/aa')
+class Checker(BaseModel):
+    mixmatrix: dict[PurePosixPath, dict[PurePosixPath, Item]]
+    cols: list[PurePosixPath]
+
+    @classmethod
+    def checker(cls, *scanned_dirs):
+        _result = {}
+        for scanned_dir in scanned_dirs:
+            for item in scanned_dir.items:
+                r_path = item.full_name.relative_to(
+                    scanned_dir.base_path
                 )
-            },
-        ).model_dump_json(indent=2)
-    )
+                try:
+                    _result[PurePosixPath(r_path)].setdefault(PurePosixPath(scanned_dir.base_path), item)
+                except KeyError:
+                    _result[PurePosixPath(r_path)] = {PurePosixPath(scanned_dir.base_path): item}
+        return cls(mixmatrix=_result, cols=[PurePosixPath(t.base_path) for t in scanned_dirs])
+    
+    def model_dump_table(self):
+        """"""
+        from rich.console import Console
+        from rich.table import Table
+
+        console = Console()
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column('r_path', style="dim red", )
+        for col in self.cols:
+            table.add_column(str(col), justify="center", vertical='middle')
+
+        for r_path, raw in self.mixmatrix.items():
+            table.add_row(
+                str(r_path),
+                *["True" if raw.get(tt) else "False" for tt in self.cols]
+            )
+        console.print(table)
+    
+
+
+if __name__ == '__main__':
+    import json
+    from pathlib import Path
+
+    checker = Checker.checker(*[SyncDir(**s) for s in json.load(
+        Path(__file__).parent.parent.joinpath('tests/resource/SyncDirs.json').open())
+                        ])
+    checker.model_dump_table()
