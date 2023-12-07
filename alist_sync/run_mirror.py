@@ -13,8 +13,8 @@ import logging
 
 from alist_sdk import Item
 
-from .models import RemoveTask, SyncDir
-from .run_copy import CopyToTarget
+from alist_sync.models import RemoveTask, SyncDir
+from alist_sync.run_copy import CopyToTarget
 
 logger = logging.getLogger("alist-sync.mirror")
 

@@ -1,14 +1,16 @@
 import datetime
 import json
 from pathlib import PurePosixPath, Path
-from typing import Optional
+from typing import Optional, Literal
 
 from pydantic import BaseModel, computed_field, Field
 from alist_sdk import Item
 
-from .alist_client import AlistClient
+from alist_sync.alist_client import AlistClient
 
 __all__ = ["AlistServer", "SyncDir", "CopyTask", "RemoveTask", "SyncTask"]
+
+StatusModify = Literal["init", "created", ]
 
 
 class AlistServer(BaseModel):

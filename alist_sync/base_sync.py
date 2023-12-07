@@ -2,11 +2,11 @@ import os
 import logging
 import asyncio
 
-from .alist_client import AlistClient
-from .config import cache_dir
-from .models import SyncTask, AlistServer
-from .scan_dir import scan_dir
-from .common import sha1_6, is_task_all_success, timeout_input
+from alist_sync.alist_client import AlistClient
+from alist_sync.config import cache_dir
+from alist_sync.models import SyncTask, AlistServer
+from alist_sync.scan_dir import scan_dir
+from alist_sync.common import sha1_6, is_task_all_success, timeout_input
 
 logger = logging.getLogger("alist-sync.base")
 
@@ -18,7 +18,7 @@ class SyncBase:
                  sync_dirs: list[str | os.PathLike]
                  ):
         self.client = AlistClient(
-            timeout=30, **alist_info.model_dump(exclude='storage_config')
+            timeout=30, **alist_info.model_dump(exclude={'storage_config'})
         )
 
         self.sync_dirs = sync_dirs

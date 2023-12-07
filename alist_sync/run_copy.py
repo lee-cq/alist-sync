@@ -4,9 +4,9 @@ from pathlib import PurePosixPath
 
 from alist_sdk import Item, Task
 
-from .base_sync import SyncBase
-from .models import AlistServer, SyncDir, CopyTask
-from .common import async_all_task_names
+from alist_sync.base_sync import SyncBase
+from alist_sync.models import AlistServer, SyncDir, CopyTask
+from alist_sync.common import async_all_task_names
 
 logger = logging.getLogger("alist-sync.copy-to-target")
 

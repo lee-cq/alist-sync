@@ -5,9 +5,9 @@
 各个Dir分别成为源目录，并Copy至其他目录
 
 """
-from .base_sync import SyncBase
-from .run_copy import CopyToTarget
-from .models import AlistServer
+from alist_sync.base_sync import SyncBase
+from alist_sync.run_copy import CopyToTarget
+from alist_sync.models import AlistServer
 
 
 class Sync:

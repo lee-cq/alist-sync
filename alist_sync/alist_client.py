@@ -4,7 +4,7 @@ import time
 
 from alist_sdk import AsyncClient as _AsyncClient, Task
 
-from .common import async_all_task_names
+from alist_sync.common import async_all_task_names
 
 logger = logging.getLogger("alist-sync.client")
 

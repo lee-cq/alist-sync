@@ -1,6 +1,5 @@
 #!/bin/env python3
 # coding: utf8
-import os
 import logging
 from pathlib import Path
 
@@ -25,7 +24,7 @@ _username: str = Option(
     help="Alist Admin Username"
 )
 
-_passwprd: str = Option(
+_password: str = Option(
     '', "--password", "-p",
     help="Alist Admin Password"
 )
@@ -50,7 +49,7 @@ _stores_config: str = Option(
 def copy(
         base_url: str = _base_url,
         username: str = _username,
-        password: str = _passwprd,
+        password: str = _password,
         token: str = _token,
         verify: bool = _verify,
         storage_config: str = _stores_config,
@@ -77,7 +76,7 @@ def copy(
 def mirror(
         base_url: str = _base_url,
         username: str = _username,
-        password: str = _passwprd,
+        password: str = _password,
         token: str = _token,
         verify: bool = _verify,
         storage_config: str = _stores_config,
@@ -104,7 +103,7 @@ def mirror(
 def sync(
         base_url: str = _base_url,
         username: str = _username,
-        password: str = _passwprd,
+        password: str = _password,
         token: str = _token,
         verify: bool = _verify,
         storage_config: str = _stores_config,
@@ -129,7 +128,7 @@ def sync_incr(
         cache_dir: str = Option(Path(), "--cache-dir", "-c", help="配置缓存目录"),
         base_url: str = _base_url,
         username: str = _username,
-        password: str = _passwprd,
+        password: str = _password,
         token: str = _token,
         verify: bool = _verify,
         storage_config: str = _stores_config,
