@@ -7,9 +7,11 @@ from alist_sdk import Item
 
 from alist_sync.alist_client import AlistClient
 
-__all__ = ["AlistServer", "SyncDir", "CopyTask", "RemoveTask", "SyncJob", "Checker"]
+__all__ = ["AlistServer", "SyncDir", "CopyTask",
+           "RemoveTask", "SyncJob", "Checker"]
 
-CopyStatusModify = Literal["init", "created", "waiting", "getting src object", "", "running", "success"]
+CopyStatusModify = Literal["init", "created", "waiting",
+                           "getting src object", "", "running", "success"]
 
 
 class AlistServer(BaseModel):
@@ -158,10 +160,19 @@ class Checker(BaseModel):
                     scanned_dir.base_path
                 )
                 try:
-                    _result[PurePosixPath(r_path)].setdefault(PurePosixPath(scanned_dir.base_path), item)
+                    _result[PurePosixPath(r_path)].setdefault(
+                        PurePosixPath(scanned_dir.base_path),
+                        item
+                    )
                 except KeyError:
-                    _result[PurePosixPath(r_path)] = {PurePosixPath(scanned_dir.base_path): item}
-        return cls(mixmatrix=_result, cols=[PurePosixPath(t.base_path) for t in scanned_dirs])
+                    _result[PurePosixPath(r_path)] = {
+                        PurePosixPath(scanned_dir.base_path): item
+                    }
+
+        return cls(
+            matrix=_result,
+            cols=[PurePosixPath(t.base_path) for t in scanned_dirs]
+        )
 
     def model_dump_table(self):
         """"""
@@ -188,5 +199,5 @@ if __name__ == '__main__':
 
     checker = Checker.checker(*[SyncDir(**s) for s in json.load(
         Path(__file__).parent.parent.joinpath('tests/resource/SyncDirs.json').open())
-                                ])
+    ])
     checker.model_dump_table()
