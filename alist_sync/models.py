@@ -1,16 +1,15 @@
 import datetime
-import json
 from pathlib import PurePosixPath, Path
-from typing import  Optional, Literal
+from typing import Optional, Literal
 
 from pydantic import BaseModel, computed_field, Field
 from alist_sdk import Item
 
 from alist_sync.alist_client import AlistClient
 
-__all__ = ["AlistServer", "SyncDir", "CopyTask", "RemoveTask", "SyncTask", "Checker"]
+__all__ = ["AlistServer", "SyncDir", "CopyTask", "RemoveTask", "SyncJob", "Checker"]
 
-CopyStatusModify = Literal["init", "created", "waitting","getting src object", "", "running", "seccess"]
+CopyStatusModify = Literal["init", "created", "waiting", "getting src object", "", "running", "success"]
 
 
 class AlistServer(BaseModel):
@@ -45,7 +44,7 @@ class AlistServer(BaseModel):
 
         _load_storages = json.load(self.storage_config.open())
         if isinstance(_load_storages, list):
-            _load_storages = [_s for _s in _load_storages if is_storage()]
+            _load_storages = [_s for _s in _load_storages if is_storage(_s)]
             if _load_storages:
                 return _load_storages
             raise KeyError()
@@ -53,7 +52,8 @@ class AlistServer(BaseModel):
         if isinstance(_load_storages, dict):
             if 'storages' in _load_storages:
                 _load_storages = [
-                    _s for _s in _load_storages['storages'] if is_storage()]
+                    _s for _s in _load_storages['storages'] if is_storage(_s)
+                ]
                 if _load_storages:
                     return _load_storages
                 raise KeyError()
@@ -86,6 +86,7 @@ class CopyTask(BaseModel):
     # 任务状态 init: 初始化，created: 已创建，"getting src object": 运行中，"": 已完成，"failed": 失败
     status: CopyStatusModify = "init"
     message: Optional[str] = ''
+
     @computed_field()
     @property
     def name(self) -> str:
@@ -123,7 +124,7 @@ class RemoveTask(BaseModel):
     status: str = 'init'
 
 
-class SyncTask(BaseModel):
+class SyncJob(BaseModel):
     """同步任务"""
     alist_info: AlistServer  # Alist Info
     sync_dirs: dict[str, SyncDir] = {}  # 同步目录
@@ -145,7 +146,7 @@ class Config(BaseModel):
 
 
 class Checker(BaseModel):
-    mixmatrix: dict[PurePosixPath, dict[PurePosixPath, Item]]
+    matrix: dict[PurePosixPath, dict[PurePosixPath, Item]]
     cols: list[PurePosixPath]
 
     @classmethod
@@ -161,7 +162,7 @@ class Checker(BaseModel):
                 except KeyError:
                     _result[PurePosixPath(r_path)] = {PurePosixPath(scanned_dir.base_path): item}
         return cls(mixmatrix=_result, cols=[PurePosixPath(t.base_path) for t in scanned_dirs])
-    
+
     def model_dump_table(self):
         """"""
         from rich.console import Console
@@ -173,13 +174,12 @@ class Checker(BaseModel):
         for col in self.cols:
             table.add_column(str(col), justify="center", vertical='middle')
 
-        for r_path, raw in self.mixmatrix.items():
+        for r_path, raw in self.matrix.items():
             table.add_row(
                 str(r_path),
                 *["True" if raw.get(tt) else "False" for tt in self.cols]
             )
         console.print(table)
-    
 
 
 if __name__ == '__main__':
@@ -188,5 +188,5 @@ if __name__ == '__main__':
 
     checker = Checker.checker(*[SyncDir(**s) for s in json.load(
         Path(__file__).parent.parent.joinpath('tests/resource/SyncDirs.json').open())
-                        ])
+                                ])
     checker.model_dump_table()

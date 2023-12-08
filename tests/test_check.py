@@ -23,4 +23,4 @@ def test_checker(scanned_dirs):
 )
 def test_check(scanned_dirs):
     checker = CheckModel.checker(*scanned_dirs)
-    assert checker.mixmatrix
+    assert checker.matrix

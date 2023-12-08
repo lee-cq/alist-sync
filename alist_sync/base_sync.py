@@ -4,7 +4,7 @@ import asyncio
 
 from alist_sync.alist_client import AlistClient
 from alist_sync.config import cache_dir
-from alist_sync.models import SyncTask, AlistServer, Checker
+from alist_sync.models import SyncJob, AlistServer, Checker
 from alist_sync.scan_dir import scan_dir
 from alist_sync.common import sha1_6, is_task_all_success, timeout_input
 
@@ -27,7 +27,7 @@ class SyncBase:
         self.sync_task_cache_file = cache_dir.joinpath(
             f"sync_task_{sha1_6(self.sync_dirs)}.json"
         )
-        self.sync_task = SyncTask(
+        self.sync_job = SyncJob(
             alist_info=alist_info,
         )
         self.load_from_cache()
@@ -41,21 +41,21 @@ class SyncBase:
         """从缓存中加载"""
         if not self.sync_task_cache_file.exists():
             return
-        self.sync_task = SyncTask.model_validate_json(
+        self.sync_job = SyncJob.model_validate_json(
             self.sync_task_cache_file.read_text())
 
     def save_to_cache(self):
         """保存到缓存中"""
         self.sync_task_cache_file.write_text(
-            self.sync_task.model_dump_json(indent=2)
+            self.sync_job.model_dump_json(indent=2)
         )
 
     def clear_cache(self, force=False):
         """清除缓存"""
         if force:
             self.sync_task_cache_file.unlink(missing_ok=True)
-        if all((is_task_all_success(self.sync_task.copy_tasks),
-                is_task_all_success(self.sync_task.remove_tasks)
+        if all((is_task_all_success(self.sync_job.copy_tasks),
+                is_task_all_success(self.sync_job.remove_tasks)
                 )):
             self.sync_task_cache_file.unlink(missing_ok=True)
 
@@ -79,7 +79,7 @@ class SyncBase:
         """扫描目录"""
 
         async def scan(path):
-            self.sync_task.sync_dirs.setdefault(
+            self.sync_job.sync_dirs.setdefault(
                 path, await scan_dir(self.client, path)
             )
 
@@ -99,11 +99,11 @@ class SyncBase:
         asyncio.run(self.async_run())
 
     async def async_run(self):
-        await self.create_storages(self.sync_task.alist_info.storages())
-        if not self.sync_task.sync_dirs.values():
+        await self.create_storages(self.sync_job.alist_info.storages())
+        if not self.sync_job.sync_dirs.values():
             await self.scans()
             self.save_to_cache()
-            self.sync_task.checker = Checker.checker(*self.sync_task.sync_dirs.values())
+            self.sync_job.checker = Checker.checker(*self.sync_job.sync_dirs.values())
         else:
             logger.info(f"一件从缓存中找到 %d 个 SyncDir",
-                        len(self.sync_task.sync_dirs))
+                        len(self.sync_job.sync_dirs))

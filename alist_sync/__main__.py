@@ -45,6 +45,7 @@ _stores_config: str = Option(
     help="一个包含存储配置的JSON文件，可以是AList的备份文件"
 )
 
+
 @app.command(name='check')
 def check(
         base_url: str = _base_url,
@@ -68,9 +69,8 @@ def check(
         f"Will Be Check {target} "
         "on {alist_info.base_url} [{alist_info.username}]"
     )
-    return SyncBase(alist_info=alist_info, sync_dirs=target).sync_task.checker.model_dump_table()
+    return SyncBase(alist_info=alist_info, sync_dirs=target).sync_job.checker.model_dump_table()
 
-    
 
 @app.command(name="copy")
 def copy(

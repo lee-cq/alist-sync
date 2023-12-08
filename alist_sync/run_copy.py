@@ -25,12 +25,12 @@ class CopyToTarget(SyncBase):
         await super().async_run()
 
         # 创建复制列表
-        if not self.sync_task.copy_tasks:
+        if not self.sync_job.copy_tasks:
             self.create_copy_list()
             self.save_to_cache()
         else:
             logger.info(f"一件从缓存中找到 %d 个 CopyTask",
-                        len(self.sync_task.copy_tasks))
+                        len(self.sync_job.copy_tasks))
 
         # 复制文件
         asyncio.create_task(self.copy_files(), name="copy_files")
@@ -57,21 +57,21 @@ class CopyToTarget(SyncBase):
                 copy_target=PurePosixPath(target.base_path).joinpath(
                     copy_path.parent),  # 需要复制到的目标文件夹
             )
-            self.sync_task.copy_tasks[task.name] = task
+            self.sync_job.copy_tasks[task.name] = task
             self.save_to_cache()
             logger.debug("[%s -> %s] %s: 已创建复制任务信息。",
                          source.base_path, target.base_path, copy_path)
 
     @property
     def scanned_source_dir(self) -> SyncDir:
-        _s = self.sync_task.sync_dirs.get(self.source_path)
+        _s = self.sync_job.sync_dirs.get(self.source_path)
         if _s is None:
             raise  # TODO
         return _s
 
     @property
     def scanned_targets_dir(self) -> list[SyncDir]:
-        _ts = [self.sync_task.sync_dirs.get(t) for t in self.targets_path]
+        _ts = [self.sync_job.sync_dirs.get(t) for t in self.targets_path]
         if _ts:
             return _ts
         raise  # TODO
@@ -81,7 +81,7 @@ class CopyToTarget(SyncBase):
         for sync_target in self.scanned_targets_dir:
             sync_target: SyncDir
             self.create_copy_task(
-                self.sync_task.sync_dirs.get(self.source_path),
+                self.sync_job.sync_dirs.get(self.source_path),
                 sync_target
             )
             logger.info(
@@ -106,7 +106,7 @@ class CopyToTarget(SyncBase):
         async def create_copy():
             while True:
                 _need_create_copy = [
-                    ct for ct in self.sync_task.copy_tasks.values() if ct.status == 'init'
+                    ct for ct in self.sync_job.copy_tasks.values() if ct.status == 'init'
                 ]
                 if not _need_create_copy:
                     logger.info("全部复制任务已经创建，create_copy exited.")
@@ -133,23 +133,23 @@ class CopyToTarget(SyncBase):
 
     def status_wait(self, task: Task):
         """等待状态"""
-        if self.sync_task.copy_tasks[task.name].status in ['created', ]:
+        if self.sync_job.copy_tasks[task.name].status in ['created', ]:
             logger.debug("[%s] 在等待排队")
-            self.sync_task.copy_tasks[task.name].status = 'waiting'
+            self.sync_job.copy_tasks[task.name].status = 'waiting'
 
     def status_getting_src(self, task: Task):
-        if self.sync_task.copy_tasks[task.name].status in ['created', 'waiting']:
+        if self.sync_job.copy_tasks[task.name].status in ['created', 'waiting']:
             logger.debug("[%s] 正在下载源数据内容 %.2f %% ...",
                          task.name, task.progress)
-            self.sync_task.copy_tasks[task.name].status = 'getting_src'
+            self.sync_job.copy_tasks[task.name].status = 'getting_src'
 
     def status_failed(self, task: Task):
         logger.warning("[%s] 复制失败：error: %s", task.name, task.error)
-        self.sync_task.copy_tasks[task.name].status = 'failed'
+        self.sync_job.copy_tasks[task.name].status = 'failed'
 
     def status_success(self, task: Task):
         logger.info("[%s] 复制完成。", task.name)
-        self.sync_task.copy_tasks[task.name].status = 'success'
+        self.sync_job.copy_tasks[task.name].status = 'success'
 
     def _not_de_status(self, task: Task):
         pass
@@ -170,7 +170,7 @@ class CopyToTarget(SyncBase):
             _, task_done = self.client.cached_copy_task_done
             _last_time, task_undone = self.client.cached_copy_task_undone
             _unsuccessful_task = [
-                t for t in self.sync_task.copy_tasks.values() if t.status != "success"
+                t for t in self.sync_job.copy_tasks.values() if t.status != "success"
             ]
             if not _unsuccessful_task:
                 logger.info("全部的复制任务已经完成。")
@@ -191,7 +191,7 @@ class CopyToTarget(SyncBase):
                     t for t in [*task_done, *task_undone] if t.name == copy_task.name
                 ]
                 for task in tasks:
-                    if task.name not in self.sync_task.copy_tasks:
+                    if task.name not in self.sync_job.copy_tasks:
                         continue
 
                     if copy_task.id is None:

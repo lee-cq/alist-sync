@@ -33,25 +33,25 @@ class Mirror(CopyToTarget):
     async def async_run(self):
         await super(CopyToTarget, self).async_run()
         # 创建复制列表
-        if not self.sync_task.copy_tasks:
+        if not self.sync_job.copy_tasks:
             self.create_copy_list()
             self.save_to_cache()
         else:
             logger.info(f"一件从缓存中找到 %d 个 CopyTask",
-                        len(self.sync_task.copy_tasks))
+                        len(self.sync_job.copy_tasks))
 
         # 复制文件
         asyncio.create_task(self.copy_files(), name="copy_files")
 
         # 创建删除列表
-        if not self.sync_task.remove_tasks:
+        if not self.sync_job.remove_tasks:
             logger.info("创建删除列表")
             self.create_remove_list()
             self.save_to_cache()
 
         else:
             logger.info(
-                f"一件从缓存中找到 %d 个 RemoveTask", len(self.sync_task.remove_tasks)
+                f"一件从缓存中找到 %d 个 RemoveTask", len(self.sync_job.remove_tasks)
             )
         await self.remove_files()  # 删除文件
 
@@ -71,7 +71,7 @@ class Mirror(CopyToTarget):
             logger.info("Add：源[%s]中不存在 - %s，计划删除 ...",
                         source_dir.base_path, re_path)
 
-            self.sync_task.remove_tasks.setdefault(
+            self.sync_job.remove_tasks.setdefault(
                 str(item.full_name),  # str
                 RemoveTask(full_path=item.full_name)
             )
@@ -95,9 +95,9 @@ class Mirror(CopyToTarget):
             names=[full_path.name, ]
         )
         if res.code == 200:
-            self.sync_task.remove_tasks.get(str(full_path)).status = "removing"
+            self.sync_job.remove_tasks.get(str(full_path)).status = "removing"
 
     async def remove_files(self):
         tasks = [asyncio.create_task(self._remove_file(item.full_path))
-                 for path, item in self.sync_task.remove_tasks.items()]
+                 for path, item in self.sync_job.remove_tasks.items()]
         await asyncio.gather(*tasks)
