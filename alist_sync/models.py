@@ -1,4 +1,5 @@
 import datetime
+import json
 from pathlib import PurePosixPath, Path
 from typing import Optional, Literal
 
@@ -23,7 +24,7 @@ class AlistServer(BaseModel):
     has_opt: Optional[bool] = False
 
     max_connect: int = 30  # 最大同时连接数
-    storage_config: Path = []
+    storage_config: Optional[Path] = None
 
     # httpx 的参数
     verify: Optional[bool] = True
@@ -39,7 +40,7 @@ class AlistServer(BaseModel):
                 return True
             return False
 
-        if not self.storage_config:
+        if not self.storage_config or self.storage_config == Path():
             return []
         if not self.storage_config.exists():
             raise FileNotFoundError(f"找不到文件：{self.storage_config}")
@@ -198,6 +199,6 @@ if __name__ == '__main__':
     from pathlib import Path
 
     checker = Checker.checker(*[SyncDir(**s) for s in json.load(
-        Path(__file__).parent.parent.joinpath('tests/resource/SyncDirs.json').open())
+        Path(__file__).parent.parent.joinpath('tests/resource/SyncDirs-m.json').open())
     ])
     checker.model_dump_table()

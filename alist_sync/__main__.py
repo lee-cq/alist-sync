@@ -40,8 +40,8 @@ _verify: bool = Option(
     help="Verify SSL Certificates"
 )
 
-_stores_config: str = Option(
-    ..., '-c', '--store-path',
+_stores_config: str | None = Option(
+    None, '-c', '--store-path',
     help="一个包含存储配置的JSON文件，可以是AList的备份文件"
 )
 
@@ -63,13 +63,16 @@ def check(
         password=password,
         token=token,
         verify=verify,
-        storage_config=storage_config,
+        storage_config=Path(storage_config) if storage_config else None,
     )
     echo(
-        f"Will Be Check {target} "
-        "on {alist_info.base_url} [{alist_info.username}]"
+        f"Will Be Check '{target} "
+        f"on {alist_info.base_url} [{alist_info.username}] \n"
+        f"将会从 {alist_info.storage_config} 存储库获取存储库信息。"
     )
-    return SyncBase(alist_info=alist_info, sync_dirs=target).sync_job.checker.model_dump_table()
+    c = SyncBase(alist_info=alist_info, sync_dirs=target)
+    c.run()
+    c.sync_job.checker.model_dump_table()
 
 
 @app.command(name="copy")
@@ -94,7 +97,8 @@ def copy(
     )
     echo(
         f"Will Be Copy '{source}' -> {target} "
-        "on {alist_info.base_url} [{alist_info.username}]"
+        f"on {alist_info.base_url} [{alist_info.username}]"
+        f"将会从 {alist_info.storage_config} 存储库获取存储库信息。"
     )
     return CopyToTarget(alist_info, source_path=source, targets_path=target).run()
 

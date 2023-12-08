@@ -20,7 +20,12 @@ SUP_DIR = Path(__file__).parent.joinpath('resource')
 
 @pytest.mark.parametrize(
     "scanned_dirs",
-    [[SyncDir(**s) for s in json.load(SUP_DIR.joinpath('SyncDirs.json').open())]]
+    [
+        [SyncDir(**s)
+         for s in json.load(SUP_DIR.joinpath('SyncDirs.json').open())],
+        [SyncDir(**s)
+         for s in json.load(SUP_DIR.joinpath('SyncDirs-m.json').open())]
+    ]
 )
 def test_check(scanned_dirs):
     checker = Checker.checker(*scanned_dirs)

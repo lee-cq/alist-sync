@@ -18,7 +18,9 @@ class SyncBase:
                  sync_dirs: list[str | os.PathLike]
                  ):
         self.client = AlistClient(
-            timeout=30, **alist_info.model_dump(exclude={'storage_config'})
+            timeout=30, **alist_info.model_dump(
+                exclude={'storage_config'}
+            )
         )
 
         self.sync_dirs = sync_dirs
@@ -103,7 +105,9 @@ class SyncBase:
         if not self.sync_job.sync_dirs.values():
             await self.scans()
             self.save_to_cache()
-            self.sync_job.checker = Checker.checker(*self.sync_job.sync_dirs.values())
+            self.sync_job.checker = Checker.checker(
+                *self.sync_job.sync_dirs.values()
+            )
         else:
             logger.info(f"一件从缓存中找到 %d 个 SyncDir",
                         len(self.sync_job.sync_dirs))

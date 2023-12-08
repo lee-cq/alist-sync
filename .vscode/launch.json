@@ -4,6 +4,7 @@
     // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "CLI - main copy",
             "type": "python",
@@ -32,6 +33,22 @@
             "console": "integratedTerminal",
             "justMyCode": true,
 
+        },
+        {
+            "name": "debug - check",
+            "type": "python",
+            "request": "launch",
+            "program": "alist_sync/__main__.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "check",
+                "-u", "admin",
+                "-p", "123456",
+                "-t", "/local",
+                "-t", "/local_dst",
+                "-t", "/local_dst2"
+            ]
         }
     ]
 }
