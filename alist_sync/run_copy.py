@@ -11,6 +11,12 @@ from alist_sync.common import async_all_task_names
 logger = logging.getLogger("alist-sync.copy-to-target")
 
 
+class Copy:
+
+    def __init__(self, alist_info: AlistServer, source_path: str, target_path: list[str]):
+        pass
+
+
 class CopyToTarget(SyncBase):
 
     def __init__(self, alist_info: AlistServer, source_path: str, targets_path: list[str]):
