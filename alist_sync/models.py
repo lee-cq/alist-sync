@@ -86,7 +86,6 @@ class SyncJob(BaseModel):
     """同步任务"""
     alist_info: AlistServer  # Alist Info
     sync_dirs: dict[str, SyncDir] = {}  # 同步目录
-    checker: Optional['Checker'] = None
 
 
 class Config(BaseModel):

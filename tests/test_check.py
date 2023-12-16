@@ -22,7 +22,6 @@ SUP_DIR = Path(__file__).parent.joinpath('resource')
 def test_check(scanned_dirs):
     cols = [PurePosixPath(i.base_path) for i in scanned_dirs]
     checker: Checker = Checker.checker(*scanned_dirs)
-    checker.save_to_cache()
     assert checker.matrix
     assert checker.cols == cols
 

@@ -5,7 +5,7 @@ from pathlib import Path
 import asyncio
 import pytest
 
-from alist_sdk import Client, Item, AsyncClient
+from alist_sdk import Client, Item
 from alist_sync.models import AlistServer, SyncDir
 from alist_sync.scan_dir import scan_dir
 from alist_sync.run_copy import CopyToTarget
@@ -72,7 +72,7 @@ def test_scan_dir():
 
     res = asyncio.run(
         scan_dir(
-            AsyncClient(base_url='http://localhost:5244',
+            AlistServer(base_url='http://localhost:5244',
                         verify=False, username='admin', password='123456'),
             "/local"
         )
@@ -99,7 +99,7 @@ def test_run_copy():
         Path(DATA_DIR / i).parent.mkdir(parents=True, exist_ok=True)
         Path(DATA_DIR / i).touch()
 
-    res = asyncio.run(
+    asyncio.run(
         CopyToTarget(
             AlistServer(base_url='http://localhost:5244',
                         verify=False,

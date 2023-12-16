@@ -4,7 +4,8 @@ import asyncio
 
 from alist_sync.alist_client import AlistClient
 from alist_sync.config import cache_dir
-from alist_sync.models import SyncJob, AlistServer, Checker
+from alist_sync.models import SyncJob, AlistServer
+from alist_sync.checker import Checker
 from alist_sync.scan_dir import scan_dir
 from alist_sync.common import sha1_6, is_task_all_success, timeout_input
 
@@ -56,9 +57,6 @@ class SyncBase:
         """清除缓存"""
         if force:
             self.sync_task_cache_file.unlink(missing_ok=True)
-        if all((is_task_all_success(self.sync_job.copy_tasks),
-                is_task_all_success(self.sync_job.remove_tasks)
-                )):
             self.sync_task_cache_file.unlink(missing_ok=True)
 
     async def create_storages(self, storages):
@@ -105,9 +103,6 @@ class SyncBase:
         if not self.sync_job.sync_dirs.values():
             await self.scans()
             self.save_to_cache()
-            self.sync_job.checker = Checker.checker(
-                *self.sync_job.sync_dirs.values()
-            )
         else:
             logger.info(f"一件从缓存中找到 %d 个 SyncDir",
                         len(self.sync_job.sync_dirs))

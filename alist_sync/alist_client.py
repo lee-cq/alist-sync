@@ -1,19 +1,49 @@
 import asyncio
+import builtins
 import logging
 import time
+from functools import lru_cache
+from typing import Literal
 
 from alist_sdk import AsyncClient as _AsyncClient, Task
 
-from alist_sync.common import async_all_task_names
+from alist_sync.common import get_alist_client
 
 logger = logging.getLogger("alist-sync.client")
 
 __all__ = ["AlistClient"]
 
+CopyStatusModify = Literal[
+    "init",
+    "created",
+    "waiting",
+    "getting src object",
+    "",
+    "running",
+    "success",
+    "failed",
+    "checked_done",
+]
 
-class TaskStat:
-    copy_task_done = 0, []
-    copy_task_undone = 0, []
+
+async def get_status(task_name, client: 'AlistClient' = None) -> tuple[CopyStatusModify, int | float]:
+    """获取任务状态
+
+    :param client: AlistClient
+    :param task_name: 任务名称
+    :return: 任务状态(状态名称，状态进展)
+    """
+    client = client or get_alist_client()
+    _task_done, _task_undone = await asyncio.gather(
+        client.cached_task_done('copy', dict),
+        client.cached_task_undone('copy', dict),
+    )
+    if task_name in _task_done and task_name not in _task_undone:
+        return 'success', 100
+    elif task_name in _task_undone:
+        return _task_undone[task_name].status, _task_undone[task_name].progress
+    else:
+        raise ValueError(f"任务不存在: {task_name}")
 
 
 class AlistClient(_AsyncClient):
@@ -21,10 +51,16 @@ class AlistClient(_AsyncClient):
     def __init__(self, base_url, max_connect=30, *,
                  token=None, username=None, password=None, has_opt=False, **kwargs):
         super().__init__(
-            base_url, token, username=username,
-            password=password, has_opt=has_opt, **kwargs)
+            base_url,
+            token,
+            username=username,
+            password=password,
+            has_opt=has_opt,
+            **kwargs)
+
         self._max_connect = asyncio.Semaphore(max_connect)
         self.__closed = False
+        setattr(builtins, 'alist_client', self)
 
     def close(self):
         self.__closed = True
@@ -37,50 +73,33 @@ class AlistClient(_AsyncClient):
         async with self._max_connect:
             return await super().request(*args, **kwargs)
 
-    async def _cache(self, attr_name, task_type):
-        wait_time = 0.01
-        while True:
-            await asyncio.sleep(wait_time)
-            if self.__closed:
-                break
-            res = await self.__getattribute__(attr_name)(task_type)
-            if res.code == 200:
-                setattr(
-                    TaskStat, f"{task_type}_{attr_name}",
-                    (
-                        int(time.time()),
-                        res.data or []
-                    )
-                )
-                wait_time = 5
-            else:
-                wait_time = 0.1
+    @staticmethod
+    def __task_rtype(rtype, data):
+        if rtype == list:
+            return data or []
+        return {i.name: i for i in data or []}
 
-    @property
-    def cached_copy_task_done(self) -> tuple[int, list[Task]]:
-        """
+    @lru_cache(maxsize=1)
+    async def cached_task_undone(
+            self,
+            task_type,
+            rtype: object = list,
+            timestamp=0
+    ) -> tuple[int, list[Task] | dict[str, Task]]:
+        """获取已完成的任务"""
+        res = await self.task_done(task_type)
+        if res.code == 200:
+            return timestamp * 5, self.__task_rtype(rtype, res.data)
+        raise ValueError(f"获取已完成的任务失败: {res.code = } {res.message = }")
 
-        :return 更新时间, {task_name, Task, ...}
-        """
-        if "cached_copy_task_done" not in async_all_task_names():
-            asyncio.create_task(
-                self._cache('task_done', 'copy'),
-                name='cached_copy_task_done'
-            )
-            logger.info("cached_copy_task_done 已经创建 ")
-
-        return TaskStat.copy_task_done
-
-    @property
-    def cached_copy_task_undone(self) -> tuple[int, list[Task]]:
-        """
-
-        :return 更新时间, {task_name, Task, ...}
-        """
-        if "cached_copy_task_undone" not in async_all_task_names():
-            asyncio.create_task(
-                self._cache('task_undone', 'copy'),
-                name='cached_copy_task_undone'
-            )
-            logger.info("cached_copy_task_undone 已经创建 ")
-        return getattr(TaskStat, f"copy_task_undone",)
+    @lru_cache(maxsize=1)
+    async def cached_task_undone(
+            self,
+            task_type,
+            rtype: object = list,
+            timestamp=0) -> tuple[int, list[Task] | dict[str, Task]]:
+        """获取未完成的任务"""
+        res = await self.task_undone(task_type)
+        if res.code == 200:
+            return timestamp * 5, self.__task_rtype(rtype, res.data)
+        raise ValueError(f"获取未完成的任务失败: {res.code = } {res.message = }")

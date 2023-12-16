@@ -2,6 +2,7 @@ from pathlib import PurePosixPath
 from pydantic import BaseModel
 
 from alist_sdk import Item
+from alist_sync.models import SyncDir
 
 
 class Checker(BaseModel):
@@ -11,7 +12,7 @@ class Checker(BaseModel):
     cols: list[PurePosixPath]
 
     @classmethod
-    def checker(cls, *scanned_dirs):
+    def checker(cls, *scanned_dirs: SyncDir):
         _result = {}
         for scanned_dir in scanned_dirs:
             for item in scanned_dir.items:
@@ -55,7 +56,6 @@ class Checker(BaseModel):
 if __name__ == '__main__':
     import json
     from pathlib import Path
-    from alist_sync.models import SyncDir
 
     checker = Checker.checker(*[SyncDir(**s) for s in json.load(
         Path(__file__).parent.parent.joinpath('tests/resource/SyncDirs-m.json').open())

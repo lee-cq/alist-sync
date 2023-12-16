@@ -1,15 +1,50 @@
 import asyncio
 import hashlib
-
+import builtins
 import logging
 import selectors
 import sys
+from pathlib import Path
+
+from alist_sync.config import cache_dir
 
 logger = logging.getLogger("alist-sync.common")
 
 __all__ = [
-    "sha1", "sha1_6", "async_all_task_names", "is_task_all_success", "timeout_input"
+    "get_alist_client",
+    "sha1",
+    "sha1_6",
+
+    "async_all_task_names",
+    "is_task_all_success",
+    "timeout_input",
+
+    "clear_cache",
+    "clear_path"
 ]
+
+
+# noinspection PyUnresolvedReferences
+def get_alist_client() -> 'AlistClient':
+    """获取AlistClient"""
+    if not hasattr(builtins, 'alist_client'):
+        raise ValueError("AlistClient未初始化")
+    return getattr(builtins, 'alist_client', None)
+
+
+def clear_path(path: Path):
+    """清除缓存"""
+    for i in path.iterdir():
+        if i.is_file():
+            i.unlink()
+        elif i.is_dir():
+            clear_path(i)
+            i.rmdir()
+
+
+def clear_cache():
+    """清除缓存"""
+    clear_path(cache_dir)
 
 
 def sha1(s):
@@ -52,8 +87,11 @@ def timeout_input(msg, default, timeout=3):
 if __name__ == "__main__":
     from pydantic import BaseModel
 
+
     class Task(BaseModel):
         status: str = "init"
+
+
     print(is_task_all_success(
-        [Task(status='success'), Task(status='running'),]
+        [Task(status='success'), Task(status='running'), ]
     ))
