@@ -1,16 +1,19 @@
-
 from pathlib import Path, PurePosixPath
 from typing import Literal, Optional
-from pydantic import BaseModel, computed_field, Field
-
-from alist_sdk import Item
+from pydantic import BaseModel, computed_field
 
 from alist_sync.alist_client import AlistClient
-from alist_sync.models import Checker
+from alist_sync.checker import Checker
+from alist_sync.config import cache_dir
 
 CopyStatusModify = Literal[
-    "init", "created", "waiting",
-    "getting src object", "", "running", "success"
+    "init",
+    "created",
+    "waiting",
+    "getting src object",
+    "",
+    "running",
+    "success"
 ]
 
 
@@ -57,30 +60,59 @@ class CopyTask(BaseModel):
 
 class CopyJob(BaseModel):
     """复制工作 - 从Checker中找出需要被复制的任务并创建"""
-
-    # client: AlistClient = Field(exclude=True)
-    # checker: Checker = Field(exclude=True)
+    # tasks: task_name -> task
     tasks: dict[str, CopyTask]
 
-    def dump(self):
-        pass
+    @classmethod
+    def from_json_file(cls, file: Path):
+        return cls.model_validate_json(
+            Path(file).read_text(encoding='utf-8')
+        )
 
     @classmethod
-    def load_from_file(file: Path):
-        pass
+    def from_cache(cls):
+        file = cache_dir.joinpath('copy_job.json')
+        return cls.from_json_file(file)
+
+    def save_to_cache(self):
+        file = cache_dir.joinpath('copy_job.json')
+        file.write_text(self.model_dump_json(indent=2), encoding='utf-8')
 
     @classmethod
-    def from_checker(source, target, checker: Checker, ):
+    def from_checker(cls, source, target, checker: Checker, ):
         """从Checker中创建Task"""
-        _tasks: dict[str, CopyTask] = {}
-        for r_path, pp in checker.matrix.items():
-            _s: Item | None = pp.get(source)
-            _t: Item | None = pp.get(target)
-            if _s is not None and _t is None:
-                _task = CopyTask(
-                    copy_name=_s.name,  # 需要复制到文件名
-                    copy_source=PurePosixPath(source.base_path).joinpath(
-                        copy_path.parent),  # 需要复制的源文件夹
-                    copy_target=PurePosixPath(target.base_path).joinpath(
-                        copy_path.parent),  # 需要复制到的目标文件夹
-                )
+        _tasks = {}
+
+        def _1_1(sp: PurePosixPath, tp: PurePosixPath):
+            sp, tp = PurePosixPath(sp), PurePosixPath(tp)
+            if sp not in checker.cols and tp not in checker.cols:
+                raise ValueError(f"Source: {sp} or Target: {tp} not in Checker")
+            for r_path, pp in checker.matrix.items():
+                if pp.get(sp) is not None and pp.get(tp) is None:
+                    __t = CopyTask(
+                        copy_name=pp.get(sp).name,
+                        copy_source=PurePosixPath(sp).joinpath(r_path.parent),
+                        copy_target=PurePosixPath(tp).joinpath(r_path.parent),
+                    )
+                    _tasks[__t.name] = __t
+
+        def _1_n(sp, tps):
+            sp = PurePosixPath(sp)
+            _tps = [PurePosixPath(tp) for tp in tps]
+            [_1_1(sp, tp) for tp in _tps if sp != tp]
+
+        def _n_n(sps, tps):
+            [_1_n(sp, tps) for sp in sps]
+
+        if isinstance(source, str | PurePosixPath) and isinstance(target, str | PurePosixPath):
+            _1_1(source, target)
+        elif isinstance(source, str | PurePosixPath) and isinstance(target, list | tuple):
+            _1_n(source, target)
+        elif isinstance(source, list | tuple) and isinstance(target, list | tuple):
+            _n_n(source, target)
+        else:
+            raise ValueError(f"source: {source} or target: {target} not support")
+
+        self = cls(tasks=_tasks)
+        self.save_to_cache()
+        return cls(tasks=_tasks)
