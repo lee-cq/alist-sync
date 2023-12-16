@@ -16,12 +16,15 @@ from alist_sync.run_sync_incr import SyncIncr
 app = Typer()
 
 _base_url: str = Option(
-    'http://localhost:5244', '--host', '-h',
+    'http://localhost:5244',
+    '--host', '-h',
     help="Base URL for Alist Host",
+
 )
 
 _username: str = Option(
-    '', "--username", "-u",
+    '',
+    "--username", "-u",
     help="Alist Admin Username"
 )
 
@@ -36,7 +39,8 @@ _token: str = Option(
 )
 
 _verify: bool = Option(
-    True, "--verify", "-v",
+    False, "--verify", "-v",
+    # is_flag=True,
     help="Verify SSL Certificates"
 )
 
@@ -185,11 +189,10 @@ def sync_incr(
 
 
 if __name__ == '__main__':
-    # logging.basicConfig(level='INFO')
+    from rich.logging import RichHandler
     logger = logging.getLogger('alist-sync')
-    hander = logging.StreamHandler()
-    hander.setLevel("DEBUG")
-    # hander.setFormatter("")
-    logger.addHandler(hander)
+    handler = RichHandler()
+    handler.setLevel("DEBUG")
+    logger.addHandler(handler)
     logger.setLevel("DEBUG")
     app()
