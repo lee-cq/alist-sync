@@ -5,18 +5,10 @@
 各个Dir分别成为源目录，并Copy至其他目录
 
 """
-from alist_sync.base_sync import SyncBase
-from alist_sync.run_copy import CopyToTarget
 from alist_sync.models import AlistServer
+from alist_sync.run_copy import Copy
 
 
 class Sync:
-
-    def __init__(self,
-                 alist_info: AlistServer,
-                 dirs: list[str] = []
-                 ):
-        for source in dirs:
-            targets = dirs.copy()
-            targets.remove(source)
-            CopyToTarget(alist_info, mode='copy', source_dir=source, target_path=targets)
+    def __init__(self, alist_info: AlistServer, dirs: list[str] = None):
+        pass

@@ -6,11 +6,11 @@
 @Date-Time  : 2023/12/17 18:02
 
 """
+import asyncio
 import logging
 from pathlib import Path, PurePosixPath
 from typing import Iterator
 
-import asyncio
 from pydantic import BaseModel
 
 from alist_sync.alist_client import AlistClient
@@ -99,5 +99,3 @@ class JobBase(BaseModel):
             self.save_to_cache()
             await asyncio.sleep(1)
         logger.info(f"[{self.__class__.__name__}] " f"All Done.")
-
-

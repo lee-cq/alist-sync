@@ -23,7 +23,8 @@ def create_storage_local(client_, mount_name, local_path: Path):
         "down_proxy_url": ""
     }
     if f'/{mount_name}' not in [
-        i['mount_path'] for i in client_.get("/api/admin/storage/list").json()['data']['content']
+        i['mount_path']
+        for i in client_.get("/api/admin/storage/list").json()['data']['content']
     ]:
         data = client_.post(
             "/api/admin/storage/create",

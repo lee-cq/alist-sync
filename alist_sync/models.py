@@ -1,12 +1,10 @@
 import datetime
 import json
 from pathlib import PurePosixPath, Path
-from typing import Optional, Literal
+from typing import Optional
 
-from pydantic import BaseModel, computed_field, Field
 from alist_sdk import Item
-
-from alist_sync.alist_client import AlistClient
+from pydantic import BaseModel, Field
 
 __all__ = [
     "AlistServer",

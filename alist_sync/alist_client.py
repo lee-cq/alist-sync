@@ -4,8 +4,8 @@ import logging
 import time
 from typing import Literal
 
-from async_lru import alru_cache as lru_cache
 from alist_sdk import AsyncClient as _AsyncClient, Task
+from async_lru import alru_cache as lru_cache
 
 from alist_sync.common import get_alist_client
 

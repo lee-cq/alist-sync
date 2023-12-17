@@ -1,10 +1,11 @@
 import asyncio
-import hashlib
 import builtins
+import hashlib
 import logging
 import selectors
 import sys
 from pathlib import Path
+from typing import Iterable
 
 from alist_sync.config import cache_dir
 
@@ -14,22 +15,20 @@ __all__ = [
     "get_alist_client",
     "sha1",
     "sha1_6",
-
     "async_all_task_names",
     "is_task_all_success",
     "timeout_input",
-
     "clear_cache",
-    "clear_path"
+    "clear_path",
 ]
 
 
 # noinspection PyUnresolvedReferences
-def get_alist_client() -> 'AlistClient':
+def get_alist_client() -> "AlistClient":
     """获取AlistClient"""
-    if not hasattr(builtins, 'alist_client'):
+    if not hasattr(builtins, "alist_client"):
         raise ValueError("AlistClient未初始化")
-    return getattr(builtins, 'alist_client', None)
+    return getattr(builtins, "alist_client", None)
 
 
 def clear_path(path: Path):
@@ -62,12 +61,12 @@ def async_all_task_names() -> set:
     return {t.get_name() for t in asyncio.all_tasks()}
 
 
-def is_task_all_success(tasks: list | dict) -> bool:
+def is_task_all_success(tasks: Iterable | dict) -> bool:
     if not tasks:
         return True
     if isinstance(tasks, dict):
         tasks = tasks.values()
-    return all(1 if i.status == 'success' else 0 for i in tasks)
+    return all(1 if i.status == "success" else 0 for i in tasks)
 
 
 def timeout_input(msg, default, timeout=3):
@@ -80,18 +79,21 @@ def timeout_input(msg, default, timeout=3):
         key, _ = events[0]
         return key.fileobj.readline().rstrip()
     else:
-        sys.stdout.write('\n')
+        sys.stdout.write("\n")
         return default
 
 
 if __name__ == "__main__":
     from pydantic import BaseModel
 
-
     class Task(BaseModel):
         status: str = "init"
 
-
-    print(is_task_all_success(
-        [Task(status='success'), Task(status='running'), ]
-    ))
+    print(
+        is_task_all_success(
+            [
+                Task(status="success"),
+                Task(status="running"),
+            ]
+        )
+    )

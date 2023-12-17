@@ -1,7 +1,8 @@
 from pathlib import PurePosixPath
-from pydantic import BaseModel
 
 from alist_sdk import Item
+from pydantic import BaseModel
+
 from alist_sync.models import SyncDir
 
 

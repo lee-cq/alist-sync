@@ -5,10 +5,9 @@ from pathlib import Path
 
 from typer import Typer, Option, echo, style
 
-from alist_sync.models import AlistServer
-
 from alist_sync.base_sync import SyncBase
-from alist_sync.run_copy import CopyToTarget
+from alist_sync.models import AlistServer
+from alist_sync.run_copy import Copy
 from alist_sync.run_mirror import Mirror
 from alist_sync.run_sync import Sync
 from alist_sync.run_sync_incr import SyncIncr
@@ -104,7 +103,7 @@ def copy(
         f"on {alist_info.base_url} [{alist_info.username}]"
         f"将会从 {alist_info.storage_config} 存储库获取存储库信息。"
     )
-    return CopyToTarget(alist_info, source_path=source, targets_path=target).run()
+    return Copy(alist_info, source_path=source, targets_path=target).run()
 
 
 @app.command('mirror')

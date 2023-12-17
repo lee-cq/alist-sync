@@ -3,14 +3,13 @@ import time
 from pathlib import Path
 
 import asyncio
-import pytest
 
 from alist_sdk import Client, Item
 
 from alist_sync.alist_client import AlistClient
 from alist_sync.models import AlistServer, SyncDir
 from alist_sync.scan_dir import scan_dir
-from alist_sync.run_copy import CopyToTarget
+from alist_sync.run_copy import Copy
 from alist_sync.run_mirror import Mirror
 from alist_sync.config import cache_dir
 
@@ -94,7 +93,7 @@ def test_run_copy():
         Path(DATA_DIR / i).touch()
 
     asyncio.run(
-        CopyToTarget(
+        Copy(
             AlistServer(
                 base_url="http://localhost:5244",
                 verify=False,

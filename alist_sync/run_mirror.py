@@ -11,13 +11,11 @@ source -> [target, ...]
 import asyncio
 import logging
 
-from alist_sdk import Item
-
+from alist_sync.base_sync import SyncBase
 from alist_sync.checker import Checker
 from alist_sync.common import async_all_task_names
 from alist_sync.job_copy import CopyJob
 from alist_sync.job_remove import RemoveJob
-from alist_sync.base_sync import SyncBase
 
 logger = logging.getLogger("alist-sync.mirror")
 

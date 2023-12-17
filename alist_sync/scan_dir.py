@@ -5,10 +5,9 @@ from pathlib import PurePosixPath
 
 from alist_sdk import Item
 
+from alist_sync.alist_client import AlistClient
 from .common import get_alist_client
 from .models import SyncDir
-
-from alist_sync.alist_client import AlistClient
 
 logger = logging.getLogger("alist-sync.scan-dir")
 
