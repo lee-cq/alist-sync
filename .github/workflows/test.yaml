@@ -13,24 +13,27 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        alist-version: [ '3.29.0', '3.29.1' ]
+        python-version: [ '3.10', '3.11', '3.12' ]
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install git+https://github.com/lee-cq/alist-sdk
-        pip install -e .
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install git+https://github.com/lee-cq/alist-sdk
+          pip install -e .
 
-    - name: Run Tests
-      run: |
-        pip install pytest
-        python -m pytest --log-level=INFO
+      - name: Run Tests
+        run: |
+          pip install pytest
+          python -m pytest --log-level=INFO
+        env:
+          ALIST_VERSION: ${{ matrix.alist-version }}
