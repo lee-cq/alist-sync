@@ -4,13 +4,35 @@ from pathlib import PurePosixPath, Path
 from typing import Optional
 
 from alist_sdk import Item
-from pydantic import BaseModel, Field
+from pydantic import BaseModel as _BaseModel, Field
 
 __all__ = [
+    "BaseModel",
     "AlistServer",
     "SyncDir",
     "SyncJob",
 ]
+
+from alist_sync.config import cache_dir
+
+
+class BaseModel(_BaseModel):
+    """基础模型"""
+
+    @classmethod
+    def from_json_file(cls, file: Path):
+        return cls.model_validate_json(Path(file).read_text(encoding="utf-8"))
+
+    @classmethod
+    def from_cache(cls):
+        class_name = cls.__name__
+        file = cache_dir.joinpath(f"{class_name}.json")
+        return cls.from_json_file(file)
+
+    def save_to_cache(self):
+        class_name = self.__class__.__name__
+        file = cache_dir.joinpath(f"{class_name}.json")
+        file.write_text(self.model_dump_json(indent=2), encoding="utf-8")
 
 
 class AlistServer(BaseModel):

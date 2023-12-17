@@ -8,35 +8,18 @@
 """
 import asyncio
 import logging
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 from typing import Iterator
 
-from pydantic import BaseModel
-
+from alist_sync.models import BaseModel
 from alist_sync.alist_client import AlistClient
 from alist_sync.checker import Checker
 from alist_sync.common import get_alist_client
-from alist_sync.config import cache_dir
 
 logger = logging.getLogger("alist-sync.jobs")
 
 
 class JobBase(BaseModel):
-    @classmethod
-    def from_json_file(cls, file: Path):
-        return cls.model_validate_json(Path(file).read_text(encoding="utf-8"))
-
-    @classmethod
-    def from_cache(cls):
-        class_name = cls.__name__
-        file = cache_dir.joinpath(f"{class_name}.json")
-        return cls.from_json_file(file)
-
-    def save_to_cache(self):
-        class_name = self.__class__.__name__
-        file = cache_dir.joinpath(f"{class_name}.json")
-        file.write_text(self.model_dump_json(indent=2), encoding="utf-8")
-
     @staticmethod
     def create_task(_s, _t, checker: Checker) -> Iterator[BaseModel]:
         raise NotImplementedError

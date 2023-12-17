@@ -6,7 +6,7 @@ from alist_sync.alist_client import AlistClient
 from alist_sync.common import sha1_6, timeout_input
 from alist_sync.config import cache_dir
 from alist_sync.models import SyncJob, AlistServer
-from alist_sync.scan_dir import scan_dir
+from alist_sync.scanner import scan_dir
 
 logger = logging.getLogger("alist-sync.base")
 

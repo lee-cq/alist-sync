@@ -1,51 +1,22 @@
-import os
-import time
 from pathlib import Path
 
 import asyncio
 
-from alist_sdk import Client, Item
+from alist_sdk import Item
 
 from alist_sync.alist_client import AlistClient
 from alist_sync.models import AlistServer, SyncDir
-from alist_sync.scan_dir import scan_dir
+from alist_sync.scanner import scan_dir
 from alist_sync.run_copy import Copy
 from alist_sync.run_mirror import Mirror
-from alist_sync.config import cache_dir
 
-from .common import create_storage_local, clear_dir
-
-WORKDIR = Path(__file__).parent
-DATA_DIR = WORKDIR / "alist/test_dir"
-DATA_DIR_DST = WORKDIR / "alist/test_dir_dst"
-DATA_DIR_DST2 = WORKDIR / "alist/test_dir_dst2"
-
-
-def setup_module():
-    print("setup_module")
-    assert os.system(f"bash {WORKDIR}/init_alist.sh") == 0
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    DATA_DIR_DST.mkdir(parents=True, exist_ok=True)
-    DATA_DIR_DST2.mkdir(parents=True, exist_ok=True)
-    time.sleep(2)
-    _client = Client(
-        "http://localhost:5244", verify=False, username="admin", password="123456"
-    )
-    create_storage_local(_client, mount_name="/local", local_path=DATA_DIR)
-    create_storage_local(_client, mount_name="/local_dst", local_path=DATA_DIR_DST)
-    create_storage_local(_client, mount_name="/local_dst2", local_path=DATA_DIR_DST2)
-
-
-def setup_function():
-    print("setup_function")
-    clear_dir(DATA_DIR)
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    clear_dir(DATA_DIR_DST)
-    DATA_DIR_DST.mkdir(parents=True, exist_ok=True)
-    clear_dir(DATA_DIR_DST2)
-    DATA_DIR_DST2.mkdir(parents=True, exist_ok=True)
-    clear_dir(cache_dir)
-    cache_dir.mkdir(parents=True, exist_ok=True)
+from .common import (
+    DATA_DIR,
+    DATA_DIR_DST,
+    DATA_DIR_DST2,
+    setup_module,
+    setup_function,
+)
 
 
 def test_scan_dir():
