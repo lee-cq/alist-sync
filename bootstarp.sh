@@ -15,7 +15,7 @@ case $1 in
 install ) 
     pip install -U pip
     pip install -e .
-    pip install git+https://github.com/lee-cq/alist-sdk --no-cache-dir
+    pip install  git+https://github.com/lee-cq/alist-sdk --no-cache-dir --force-reinstall
     ;;
 
 alist-init ) 
@@ -53,7 +53,8 @@ test )
     clear
     pkill alist
     all_clear
-    pytest -v
+    shift 1
+    pytest -v "$@"
     ;;
 * )
     echo "Usage: $0 {install|alist-init|alist-version|alist-run|alist-stop|clear|test}"

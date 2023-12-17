@@ -2,6 +2,7 @@ import logging
 
 from alist_sync.base_sync import SyncBase
 from alist_sync.checker import Checker
+from alist_sync.common import async_all_task_names
 from alist_sync.models import AlistServer
 from alist_sync.job_copy import CopyJob
 
@@ -25,5 +26,6 @@ class CopyToTarget(SyncBase):
         )
         copy_job = CopyJob.from_checker(self.source_path, self.targets_path, checker)
         await copy_job.start(self.client)
+        logger.info('当前全部的Task %s', async_all_task_names())
 
         logger.info("复制完成。")

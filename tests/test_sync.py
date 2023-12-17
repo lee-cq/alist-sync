@@ -6,6 +6,8 @@ import asyncio
 import pytest
 
 from alist_sdk import Client, Item
+
+from alist_sync.alist_client import AlistClient
 from alist_sync.models import AlistServer, SyncDir
 from alist_sync.scan_dir import scan_dir
 from alist_sync.run_copy import CopyToTarget
@@ -22,28 +24,17 @@ DATA_DIR_DST2 = WORKDIR / "alist/test_dir_dst2"
 
 def setup_module():
     print("setup_module")
-    assert os.system(f'bash {WORKDIR}/init_alist.sh') == 0
+    assert os.system(f"bash {WORKDIR}/init_alist.sh") == 0
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR_DST.mkdir(parents=True, exist_ok=True)
     DATA_DIR_DST2.mkdir(parents=True, exist_ok=True)
     time.sleep(2)
-    _client = Client('http://localhost:5244', verify=False,
-                     username='admin', password='123456')
-    create_storage_local(
-        _client,
-        mount_name="/local",
-        local_path=DATA_DIR
+    _client = Client(
+        "http://localhost:5244", verify=False, username="admin", password="123456"
     )
-    create_storage_local(
-        _client,
-        mount_name="/local_dst",
-        local_path=DATA_DIR_DST
-    )
-    create_storage_local(
-        _client,
-        mount_name="/local_dst2",
-        local_path=DATA_DIR_DST2
-    )
+    create_storage_local(_client, mount_name="/local", local_path=DATA_DIR)
+    create_storage_local(_client, mount_name="/local_dst", local_path=DATA_DIR_DST)
+    create_storage_local(_client, mount_name="/local_dst2", local_path=DATA_DIR_DST2)
 
 
 def setup_function():
@@ -72,9 +63,13 @@ def test_scan_dir():
 
     res = asyncio.run(
         scan_dir(
-            AlistServer(base_url='http://localhost:5244',
-                        verify=False, username='admin', password='123456'),
-            "/local"
+            AlistClient(
+                base_url="http://localhost:5244",
+                verify=False,
+                username="admin",
+                password="123456",
+            ),
+            "/local",
         )
     )
 
@@ -83,8 +78,7 @@ def test_scan_dir():
     assert isinstance(res.items, list)
     assert res.items.__len__() == len(items)
     assert isinstance(res.items[0], Item)
-    assert {i.full_name.as_posix() for i in res.items} == {
-        f"/local/{i}" for i in items}
+    assert {i.full_name.as_posix() for i in res.items} == {f"/local/{i}" for i in items}
 
 
 def test_run_copy():
@@ -101,12 +95,14 @@ def test_run_copy():
 
     asyncio.run(
         CopyToTarget(
-            AlistServer(base_url='http://localhost:5244',
-                        verify=False,
-                        username='admin',
-                        password='123456'),
+            AlistServer(
+                base_url="http://localhost:5244",
+                verify=False,
+                username="admin",
+                password="123456",
+            ),
             source_path="/local",
-            targets_path=["/local_dst", '/local_dst2']
+            targets_path=["/local_dst", "/local_dst2"],
         ).async_run()
     )
     assert DATA_DIR_DST.joinpath("test_scan_dir/a/a.txt").exists()
@@ -122,14 +118,10 @@ def test_mirror():
         "test_scan_dir/d.txt",
         "e.txt",
     }
-    items_tar1 = {
-        "test_scan_dir/a/a.txt",
-        "tar1/b.txt",
-        "f.txt"
-    }
+    items_tar1 = {"test_scan_dir/a/a.txt", "tar1/b.txt", "f.txt"}
     items_tar2 = {
         "tar2/g.txt",
-        'g.txt',
+        "g.txt",
     }
 
     for i in items_sou:
@@ -154,12 +146,13 @@ def test_mirror():
     asyncio.run(
         Mirror(
             AlistServer(
-                base_url='http://localhost:5244',
+                base_url="http://localhost:5244",
                 verify=False,
-                username='admin',
-                password='123456'),
+                username="admin",
+                password="123456",
+            ),
             source_path="/local",
-            targets_path=["/local_dst", "/local_dst2"]
+            targets_path=["/local_dst", "/local_dst2"],
         ).async_run()
     )
 

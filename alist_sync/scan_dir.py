@@ -4,6 +4,8 @@ import logging
 from pathlib import PurePosixPath
 
 from alist_sdk import Item
+
+from .common import get_alist_client
 from .models import SyncDir
 
 from alist_sync.alist_client import AlistClient
@@ -14,8 +16,8 @@ __all__ = ["scan_dir"]
 
 
 class ScanDir:
-    def __init__(self, client: AlistClient):
-        self.client = client
+    def __init__(self, client: AlistClient = None):
+        self.client = client or get_alist_client()
         self.itme_list: list[Item] = []
 
     async def async_run(self, scan_path):
@@ -35,15 +37,14 @@ class ScanDir:
         """列出目录"""
         res = await self.client.list_files(path, refresh=True)
         if res.code != 200:
-            logger.warning("扫描目录异常: %s [code: %d] %s",
-                           path, res.code, res.message)
+            logger.warning("扫描目录异常: %s [code: %d] %s", path, res.code, res.message)
             if retry:
                 return await self.list_files(path=path, retry=retry - 1)
             exit(1)
         return res
 
     async def scan(self, path):
-        logger.info('扫描目录 %s 中的文件.', path)
+        logger.info("扫描目录 %s 中的文件.", path)
         if isinstance(path, PurePosixPath):
             path = path.as_posix()
         res = await self.list_files(path=path)
@@ -52,8 +53,7 @@ class ScanDir:
             item.parent = path
             if item.is_dir:
                 asyncio.create_task(
-                    self.scan(item.full_name),
-                    name=f"{id(self)}_scan_{path}"
+                    self.scan(item.full_name), name=f"{id(self)}_scan_{path}"
                 )
             else:
                 self.itme_list.append(item)

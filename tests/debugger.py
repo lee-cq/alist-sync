@@ -1,3 +1,4 @@
+#!/bin/env python3
 import os
 import time
 import logging.config
@@ -5,12 +6,10 @@ from pathlib import Path
 
 import asyncio
 
-from alist_sdk import Client, Item, AsyncClient
+from alist_sdk import Client
 
-from alist_sync.models import AlistServer, SyncDir
-from alist_sync.scan_dir import scan_dir
+from alist_sync.models import AlistServer
 from alist_sync.run_copy import CopyToTarget
-from alist_sync.run_mirror import Mirror
 from alist_sync.config import cache_dir
 
 from common import create_storage_local, clear_dir
@@ -19,6 +18,8 @@ WORKDIR = Path(__file__).parent
 DATA_DIR = WORKDIR / "alist/test_dir"
 DATA_DIR_DST = WORKDIR / "alist/test_dir_dst"
 DATA_DIR_DST2 = WORKDIR / "alist/test_dir_dst2"
+
+WORKDIR.joinpath('logs').mkdir(parents=True, exist_ok=True)
 
 log_config = {
     "version": 1,
@@ -41,7 +42,7 @@ log_config = {
     },
     "handlers": {
         "console": {
-            "class": "logging.StreamHandler",
+            "class": "rich.logging.RichHandler",
             "formatter": "simple",
             "level": "DEBUG",
         },
@@ -49,27 +50,27 @@ log_config = {
             "class": "logging.handlers.RotatingFileHandler",
             "formatter": "simple",
             "level": "INFO",
-            "filename": f"logs/debugger.log",
+            "filename": WORKDIR / "logs/debugger.log",
             "mode": "a+",
-            "maxBytes": 50 * 1024**2,
+            "maxBytes": 50 * 1024 ** 2,
             "backupCount": 5,
         },
         "file_warning": {
             "class": "logging.handlers.RotatingFileHandler",
             "formatter": "error",
             "level": "WARNING",
-            "filename": f"logs/debugger-error.log",
+            "filename": WORKDIR / "logs/debugger-error.log",
             "mode": "a+",
-            "maxBytes": 50 * 1024**2,
+            "maxBytes": 50 * 1024 ** 2,
             "backupCount": 5,
         },
         "root_handler": {
             "class": "logging.handlers.RotatingFileHandler",
             "level": "DEBUG",
             "formatter": "simple",
-            "filename": "logs/root.log",
+            "filename": WORKDIR / "logs/root.log",
             "mode": "a+",
-            "maxBytes": 50 * 1024**2,
+            "maxBytes": 50 * 1024 ** 2,
             "backupCount": 5,
         },
     },
@@ -88,7 +89,6 @@ log_config = {
         "level": "DEBUG",
     },
 }
-
 
 logging.config.dictConfig(log_config)
 
@@ -145,13 +145,13 @@ for i in items:
     Path(DATA_DIR / i).parent.mkdir(parents=True, exist_ok=True)
     Path(DATA_DIR / i).touch()
 
-res = asyncio.run(
-    CopyToTarget(
-        AlistServer(base_url='http://localhost:5244',
-                    verify=False,
-                    username='admin',
-                    password='123456'),
-        source_path="/local",
-        targets_path=["/local_dst", '/local_dst2']
-    ).async_run()
-)
+CopyToTarget(
+    AlistServer(
+        base_url='http://localhost:5244',
+        verify=False,
+        username='admin',
+        password='123456'
+    ),
+    source_path="/local",
+    targets_path=["/local_dst", '/local_dst2']
+).run()

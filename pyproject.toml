@@ -8,17 +8,17 @@ authors = [{ name = "LeeCQ", email = "lcq@leecq.cn" }]
 description = "Alist多驱动同步工具."
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["alist-sdk", "typer", "rich"]
+dependencies = ["alist-sdk", "typer", "rich", "async-lru", "pydantic"]
 dynamic = ["version"]
 
 classifiers = [
-  "Development Status :: 1 - Planning",
-  "Environment :: Console",
-  "Framework :: Pydantic :: 2",
-  "Natural Language :: Chinese (Simplified)",
-  "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: MIT License",
-  "Operating System :: OS Independent",
+    "Development Status :: 1 - Planning",
+    "Environment :: Console",
+    "Framework :: Pydantic :: 2",
+    "Natural Language :: Chinese (Simplified)",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
 ]
 
 [project.urls]
@@ -29,4 +29,4 @@ Issues = "https://github.com/lee-cq/alist-sync/issues"
 packages = ["alist_sync"]
 
 [tool.setuptools.dynamic]
-version = {attr = "alist_sync.version.__version__"}
+version = { attr = "alist_sync.version.__version__" }
