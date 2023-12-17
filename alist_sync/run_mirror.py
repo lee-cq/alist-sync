@@ -13,91 +13,38 @@ import logging
 
 from alist_sdk import Item
 
-from alist_sync.models import RemoveTask, SyncDir
-from alist_sync.run_copy import CopyToTarget
+from alist_sync.checker import Checker
+from alist_sync.common import async_all_task_names
+from alist_sync.job_copy import CopyJob
+from alist_sync.job_remove import RemoveJob
+from alist_sync.base_sync import SyncBase
 
 logger = logging.getLogger("alist-sync.mirror")
 
 
-class Mirror(CopyToTarget):
-
-    def __init__(self, alist_info,
-                 source_path: str = None,
-                 targets_path: list[str] = []
-                 ):
-        self.mode = 'mirrors'
-        super().__init__(alist_info,
-                         source_path=source_path,
-                         targets_path=targets_path)
+class Mirror(SyncBase):
+    def __init__(
+        self, alist_info, source_path: str = None, targets_path: list[str] = None
+    ):
+        self.mode = "mirrors"
+        self.source_path = source_path
+        self.targets_path = [] if not targets_path else targets_path
+        super().__init__(alist_info, [source_path, *targets_path])
 
     async def async_run(self):
-        await super(CopyToTarget, self).async_run()
         # 创建复制列表
-        if not self.sync_job.copy_tasks:
-            self.create_copy_list()
-            self.save_to_cache()
-        else:
-            logger.info(f"一件从缓存中找到 %d 个 CopyTask",
-                        len(self.sync_job.copy_tasks))
+        await super().async_run()
 
-        # 复制文件
-        asyncio.create_task(self.copy_files(), name="copy_files")
-
-        # 创建删除列表
-        if not self.sync_job.remove_tasks:
-            logger.info("创建删除列表")
-            self.create_remove_list()
-            self.save_to_cache()
-
-        else:
-            logger.info(
-                f"一件从缓存中找到 %d 个 RemoveTask", len(self.sync_job.remove_tasks)
-            )
-        await self.remove_files()  # 删除文件
-
-        await self.check_status()
-        logger.info("复制完成。")
-
-    def create_remove_task(self, source_dir: SyncDir, target_dir: SyncDir):
-        """source无，删除target中有的"""
-        for item in target_dir.items:
-            item: Item
-            re_path = item.full_name.relative_to(target_dir.base_path)
-            if source_dir.in_items(re_path):
-                logger.debug("Jump: 源[%s]中存在 -- %s ",
-                             source_dir.base_path, re_path)
-                continue
-
-            logger.info("Add：源[%s]中不存在 - %s，计划删除 ...",
-                        source_dir.base_path, re_path)
-
-            self.sync_job.remove_tasks.setdefault(
-                str(item.full_name),  # str
-                RemoveTask(full_path=item.full_name)
-            )
-            logger.info("添加RemoveTask：%s", item.full_name)
-
-    def create_remove_list(self):
-        for sync_target in self.scanned_targets_dir:
-            sync_target: SyncDir
-            self.create_remove_task(
-                self.scanned_source_dir, sync_target)
-            logger.info(
-                "[%s -> %s] 删除任务信息全部创建完成。",
-                self.scanned_source_dir.base_path,
-                sync_target.base_path
-            )
-
-    async def _remove_file(self, full_path):
-        """"""
-        res = await self.client.remove(
-            path=str(full_path.parent),
-            names=[full_path.name, ]
+        checker = Checker.checker(*self.sync_job.sync_dirs.values())
+        copy_job = CopyJob.from_checker(self.source_path, self.targets_path, checker)
+        delete_job = RemoveJob.from_checker(
+            self.source_path, self.targets_path, checker
         )
-        if res.code == 200:
-            self.sync_job.remove_tasks.get(str(full_path)).status = "removing"
 
-    async def remove_files(self):
-        tasks = [asyncio.create_task(self._remove_file(item.full_path))
-                 for path, item in self.sync_job.remove_tasks.items()]
-        await asyncio.gather(*tasks)
+        await asyncio.gather(
+            copy_job.start(self.client),
+            delete_job.start(self.client),
+        )
+        logger.info("当前全部的Task %s", async_all_task_names())
+
+        logger.info(f"{self.__class__.__name__}完成。")

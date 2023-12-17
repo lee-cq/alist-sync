@@ -8,14 +8,19 @@ from alist_sdk import Item
 
 from alist_sync.alist_client import AlistClient
 
-__all__ = ["AlistServer", "SyncDir", "RemoveTask", "SyncJob", ]
+__all__ = [
+    "AlistServer",
+    "SyncDir",
+    "SyncJob",
+]
 
 
 class AlistServer(BaseModel):
     """"""
-    base_url: str = 'http://localhost:5244'
-    username: Optional[str] = ''
-    password: Optional[str] = ''
+
+    base_url: str = "http://localhost:5244"
+    username: Optional[str] = ""
+    password: Optional[str] = ""
     token: Optional[str] = None
     has_opt: Optional[bool] = False
 
@@ -32,7 +37,7 @@ class AlistServer(BaseModel):
         def is_storage(_st):
             if not isinstance(_st, dict):
                 return False
-            if 'mount_path' in _st and 'driver' in _st:
+            if "mount_path" in _st and "driver" in _st:
                 return True
             return False
 
@@ -49,20 +54,23 @@ class AlistServer(BaseModel):
             raise KeyError()
 
         if isinstance(_load_storages, dict):
-            if 'storages' in _load_storages:
+            if "storages" in _load_storages:
                 _load_storages = [
-                    _s for _s in _load_storages['storages'] if is_storage(_s)
+                    _s for _s in _load_storages["storages"] if is_storage(_s)
                 ]
                 if _load_storages:
                     return _load_storages
                 raise KeyError()
             if is_storage(_load_storages):
-                return [_load_storages, ]
+                return [
+                    _load_storages,
+                ]
             raise KeyError("给定的")
 
 
 class SyncDir(BaseModel):
     """同步目录模型，定义一个同步目录"""
+
     base_path: str  # 同步基础目录
     items: list[Item]  # Item列表
 
@@ -71,25 +79,22 @@ class SyncDir(BaseModel):
     def in_items(self, path) -> bool:
         """判断path是否在items中"""
         if not self.items_relative:
-            self.items_relative = [i.full_name.relative_to(
-                self.base_path) for i in self.items]
+            self.items_relative = [
+                i.full_name.relative_to(self.base_path) for i in self.items
+            ]
         return path in self.items_relative
-
-
-class RemoveTask(BaseModel):
-    """删除文件的任务"""
-    full_path: PurePosixPath | str
-    status: str = 'init'
 
 
 class SyncJob(BaseModel):
     """同步任务"""
+
     alist_info: AlistServer  # Alist Info
     sync_dirs: dict[str, SyncDir] = {}  # 同步目录
 
 
 class Config(BaseModel):
     """配置"""
+
     name: str
     alist_info: AlistServer
     config_dir: PurePosixPath

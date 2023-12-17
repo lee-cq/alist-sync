@@ -1,14 +1,13 @@
 import logging
-from pathlib import Path, PurePosixPath
-from typing import Literal, Optional
+from pathlib import PurePosixPath
+from typing import Literal, Optional, Iterator
 
-import asyncio
 from pydantic import BaseModel, computed_field
 
 from alist_sync.alist_client import AlistClient, get_status
 from alist_sync.checker import Checker
 from alist_sync.common import get_alist_client
-from alist_sync.config import cache_dir
+from alist_sync.jobs import JobBase
 
 logger = logging.getLogger("alist-sync.job_copy")
 
@@ -114,88 +113,23 @@ class CopyTask(BaseModel):
             return False
 
 
-class CopyJob(BaseModel):
+class CopyJob(JobBase):
     """复制工作 - 从Checker中找出需要被复制的任务并创建"""
 
     # tasks: task_name -> task
     tasks: dict[str, CopyTask]
     done_tasks: dict[str, CopyTask] = {}
 
-    @classmethod
-    def from_json_file(cls, file: Path):
-        return cls.model_validate_json(Path(file).read_text(encoding="utf-8"))
-
-    @classmethod
-    def from_cache(cls):
-        file = cache_dir.joinpath("copy_job.json")
-        return cls.from_json_file(file)
-
-    def save_to_cache(self):
-        file = cache_dir.joinpath("copy_job.json")
-        file.write_text(self.model_dump_json(indent=2), encoding="utf-8")
-
-    @classmethod
-    def from_checker(
-        cls,
-        source,
-        target,
-        checker: Checker,
-    ):
-        """从Checker中创建Task"""
-        _tasks = {}
-
-        def _1_1(sp: PurePosixPath, tp: PurePosixPath):
-            sp, tp = PurePosixPath(sp), PurePosixPath(tp)
-            if sp not in checker.cols and tp not in checker.cols:
-                raise ValueError(f"Source: {sp} or Target: {tp} not in Checker")
-            for r_path, pp in checker.matrix.items():
-                if pp.get(sp) is not None and pp.get(tp) is None:
-                    __t = CopyTask(
-                        copy_name=pp.get(sp).name,
-                        copy_source=PurePosixPath(sp).joinpath(r_path.parent),
-                        copy_target=PurePosixPath(tp).joinpath(r_path.parent),
-                    )
-                    _tasks[__t.name] = __t
-
-        def _1_n(sp, tps):
-            sp = PurePosixPath(sp)
-            _tps = [PurePosixPath(tp) for tp in tps]
-            [_1_1(sp, tp) for tp in _tps if sp != tp]
-
-        def _n_n(sps, tps):
-            [_1_n(sp, tps) for sp in sps]
-
-        if isinstance(source, str | PurePosixPath) and isinstance(
-            target, str | PurePosixPath
-        ):
-            _1_1(source, target)
-        elif isinstance(source, str | PurePosixPath) and isinstance(
-            target, list | tuple
-        ):
-            _1_n(source, target)
-        elif isinstance(source, list | tuple) and isinstance(target, list | tuple):
-            _n_n(source, target)
-        else:
-            raise ValueError(f"source: {source} or target: {target} not support")
-
-        self = cls(tasks=_tasks)
-        self.save_to_cache()
-        return cls(tasks=_tasks)
-
-    async def start(self, client: AlistClient = None):
-        """开始复制任务"""
-        client = client or get_alist_client()
-        while self.tasks:
-            _keys = [k for k in self.tasks.keys()]
-            for t_name in _keys:
-                task = self.tasks[t_name]
-                _task_status = await task.check_status(client=client)
-
-                if _task_status:
-                    logger.info("任务完成: %s", task.name)
-                    self.done_tasks[task.name] = task
-                    self.tasks.pop(task.name)
-                else:
-                    logger.debug(f"任务状态: {task.name=} -> {task.status=}")
-            self.save_to_cache()
-            await asyncio.sleep(1)
+    @staticmethod
+    def create_task(_s, _t, checker: Checker) -> Iterator[CopyTask]:
+        """创建复制任务"""
+        _s, _t = PurePosixPath(_s), PurePosixPath(_t)
+        if _s not in checker.cols and _t not in checker.cols:
+            raise ValueError(f"Source: {_s} or Target: {_t} not in Checker")
+        for r_path, pp in checker.matrix.items():
+            if pp.get(_s) is not None and pp.get(_t) is None:
+                yield CopyTask(
+                    copy_name=pp.get(_s).name,
+                    copy_source=PurePosixPath(_s).joinpath(r_path.parent),
+                    copy_target=PurePosixPath(_t).joinpath(r_path.parent),
+                )

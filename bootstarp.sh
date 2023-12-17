@@ -9,6 +9,8 @@ all_clear() {
     find . -type d -name "__pycache__" -exec rm -rf {} \; 2>/dev/null
     echo ".cache"
     rm -rf alist_sync/.cache alist_sync.egg-info
+    echo "alist-test-dir"
+    rm -rf tests/alist/test_*
 }
 
 case $1 in
@@ -56,8 +58,15 @@ test )
     shift 1
     pytest -v "$@"
     ;;
+
+debugger )
+    all_clear
+    clear
+    python3 tests/debugger.py
+    ;;
+
 * )
-    echo "Usage: $0 {install|alist-init|alist-version|alist-run|alist-stop|clear|test}"
+    echo "Usage: $0 {install|alist-init|alist-version|alist-run|alist-stop|clear|debugger|test}"
     exit 1
     ;;
 esac

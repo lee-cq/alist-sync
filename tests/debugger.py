@@ -1,25 +1,23 @@
 #!/bin/env python3
+import logging.config
 import os
 import time
-import logging.config
 from pathlib import Path
-
-import asyncio
 
 from alist_sdk import Client
 
-from alist_sync.models import AlistServer
-from alist_sync.run_copy import CopyToTarget
 from alist_sync.config import cache_dir
-
+from alist_sync.models import AlistServer
 from common import create_storage_local, clear_dir
+from alist_sync.run_mirror import Mirror
+
 
 WORKDIR = Path(__file__).parent
 DATA_DIR = WORKDIR / "alist/test_dir"
 DATA_DIR_DST = WORKDIR / "alist/test_dir_dst"
 DATA_DIR_DST2 = WORKDIR / "alist/test_dir_dst2"
 
-WORKDIR.joinpath('logs').mkdir(parents=True, exist_ok=True)
+WORKDIR.joinpath("logs").mkdir(parents=True, exist_ok=True)
 
 log_config = {
     "version": 1,
@@ -52,7 +50,7 @@ log_config = {
             "level": "INFO",
             "filename": WORKDIR / "logs/debugger.log",
             "mode": "a+",
-            "maxBytes": 50 * 1024 ** 2,
+            "maxBytes": 50 * 1024**2,
             "backupCount": 5,
         },
         "file_warning": {
@@ -61,7 +59,7 @@ log_config = {
             "level": "WARNING",
             "filename": WORKDIR / "logs/debugger-error.log",
             "mode": "a+",
-            "maxBytes": 50 * 1024 ** 2,
+            "maxBytes": 50 * 1024**2,
             "backupCount": 5,
         },
         "root_handler": {
@@ -70,7 +68,7 @@ log_config = {
             "formatter": "simple",
             "filename": WORKDIR / "logs/root.log",
             "mode": "a+",
-            "maxBytes": 50 * 1024 ** 2,
+            "maxBytes": 50 * 1024**2,
             "backupCount": 5,
         },
     },
@@ -82,7 +80,7 @@ log_config = {
         "alist-sdk": {
             "handlers": ["console", "file_warning"],
             "level": "DEBUG",
-        }
+        },
     },
     "root": {
         "handlers": ["root_handler", "file_warning"],
@@ -95,28 +93,17 @@ logging.config.dictConfig(log_config)
 
 def setup_module():
     print("setup_module")
-    os.system(f'bash {WORKDIR}/init_alist.sh')
+    os.system(f"bash {WORKDIR}/init_alist.sh")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR_DST.mkdir(parents=True, exist_ok=True)
     DATA_DIR_DST2.mkdir(parents=True, exist_ok=True)
     time.sleep(2)
-    _client = Client('http://localhost:5244', verify=False,
-                     username='admin', password='123456')
-    create_storage_local(
-        _client,
-        mount_name="/local",
-        local_path=DATA_DIR
+    _client = Client(
+        "http://localhost:5244", verify=False, username="admin", password="123456"
     )
-    create_storage_local(
-        _client,
-        mount_name="/local_dst",
-        local_path=DATA_DIR_DST
-    )
-    create_storage_local(
-        _client,
-        mount_name="/local_dst2",
-        local_path=DATA_DIR_DST2
-    )
+    create_storage_local(_client, mount_name="/local", local_path=DATA_DIR)
+    create_storage_local(_client, mount_name="/local_dst", local_path=DATA_DIR_DST)
+    create_storage_local(_client, mount_name="/local_dst2", local_path=DATA_DIR_DST2)
 
 
 def setup_function():
@@ -141,17 +128,26 @@ items = [
     "test_scan_dir/d.txt",
     "e.txt",
 ]
+items_2 = [
+    "test_scan_dir/a/a.txt",
+    "g.txt",
+]
 for i in items:
     Path(DATA_DIR / i).parent.mkdir(parents=True, exist_ok=True)
     Path(DATA_DIR / i).touch()
 
-CopyToTarget(
+for i in items_2:
+    Path(DATA_DIR_DST / i).parent.mkdir(parents=True, exist_ok=True)
+    Path(DATA_DIR_DST / i).touch()
+
+
+Mirror(
     AlistServer(
-        base_url='http://localhost:5244',
+        base_url="http://localhost:5244",
         verify=False,
-        username='admin',
-        password='123456'
+        username="admin",
+        password="123456",
     ),
     source_path="/local",
-    targets_path=["/local_dst", '/local_dst2']
+    targets_path=["/local_dst", "/local_dst2"],
 ).run()
