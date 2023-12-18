@@ -4,7 +4,6 @@ from pathlib import Path, PurePosixPath
 import pytest
 
 from alist_sync.job_remove import RemoveJob
-from alist_sync.models import SyncDir
 from alist_sync.checker import Checker
 from alist_sync.job_copy import CopyJob
 
@@ -14,8 +13,8 @@ SUP_DIR = Path(__file__).parent.joinpath("resource")
 @pytest.mark.parametrize(
     "scanned_dirs",
     [
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs.json").open())],
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs-m.json").open())],
+        [ScannedDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs.json").open())],
+        [ScannedDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs-m.json").open())],
     ],
 )
 def test_check(scanned_dirs):
@@ -28,8 +27,8 @@ def test_check(scanned_dirs):
 @pytest.mark.parametrize(
     "scanned_dirs",
     [
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs.json").open())],
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs-m.json").open())],
+        [ScannedDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs.json").open())],
+        [ScannedDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs-m.json").open())],
     ],
 )
 def test_job_copy_1_1(scanned_dirs):
@@ -52,8 +51,8 @@ def test_job_copy_1_1(scanned_dirs):
 @pytest.mark.parametrize(
     "scanned_dirs",
     [
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs.json").open())],
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs-m.json").open())],
+        [ScannedDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs.json").open())],
+        [ScannedDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs-m.json").open())],
     ],
 )
 def test_job_delete_1_1(scanned_dirs):

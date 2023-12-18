@@ -2,9 +2,10 @@ import logging
 from pathlib import PurePosixPath
 from typing import Literal, Optional, Iterator
 
-from pydantic import BaseModel, computed_field
+from pydantic import computed_field
 
 from alist_sync.alist_client import AlistClient, get_status
+from alist_sync.models import BaseModel
 from alist_sync.checker import Checker
 from alist_sync.common import get_alist_client
 from alist_sync.jobs import JobBase

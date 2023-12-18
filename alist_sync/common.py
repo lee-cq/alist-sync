@@ -77,6 +77,7 @@ def timeout_input(msg, default, timeout=3):
     events = sel.select(timeout)
     if events:
         key, _ = events[0]
+        # noinspection PyUnresolvedReferences
         return key.fileobj.readline().rstrip()
     else:
         sys.stdout.write("\n")

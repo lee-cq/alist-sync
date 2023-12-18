@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 tests/alist/
 local_test*
+tmp/
 
 # C extensions
 *.so

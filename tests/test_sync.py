@@ -5,7 +5,7 @@ import asyncio
 from alist_sdk import Item
 
 from alist_sync.alist_client import AlistClient
-from alist_sync.models import AlistServer, SyncDir
+from alist_sync.models import AlistServer
 from alist_sync.scanner import scan_dir
 from alist_sync.run_copy import Copy
 from alist_sync.run_mirror import Mirror
@@ -43,7 +43,7 @@ def test_scan_dir():
         )
     )
 
-    assert isinstance(res, SyncDir)
+    assert isinstance(res, ScannedDir)
     assert res.base_path == "/local"
     assert isinstance(res.items, list)
     assert res.items.__len__() == len(items)

@@ -7,7 +7,7 @@ from alist_sdk import Item
 from pydantic import BaseModel
 
 from alist_sync.alist_client import AlistClient
-from .common import get_alist_client
+from alist_sync.common import get_alist_client
 
 logger = logging.getLogger("alist-sync.scan-dir")
 

@@ -4,6 +4,8 @@ import os
 import time
 from pathlib import Path
 import asyncio
+
+import rich
 from alist_sdk import Client
 
 from alist_sync.alist_client import AlistClient
@@ -153,4 +155,4 @@ if __name__ == "__main__":
     )
 
     d = asyncio.run(scan_dir("/local", "/local_dst", client=client))
-    print(d)
+    rich.print(d.items, )

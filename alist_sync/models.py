@@ -1,5 +1,6 @@
 import datetime
 import json
+from functools import cached_property
 from pathlib import PurePosixPath, Path
 from typing import Optional
 
@@ -9,7 +10,6 @@ from pydantic import BaseModel as _BaseModel, Field
 __all__ = [
     "BaseModel",
     "AlistServer",
-    "SyncDir",
     "SyncJob",
 ]
 
@@ -21,6 +21,9 @@ class BaseModel(_BaseModel):
 
     @classmethod
     def from_json_file(cls, file: Path):
+        """从文件中读取json"""
+        if not file.exists():
+            raise FileNotFoundError(f"找不到文件：{file}")
         return cls.model_validate_json(Path(file).read_text(encoding="utf-8"))
 
     @classmethod
@@ -88,28 +91,10 @@ class AlistServer(BaseModel):
             raise KeyError("给定的")
 
 
-class SyncDir(BaseModel):
-    """同步目录模型，定义一个同步目录"""
-
-    base_path: str  # 同步基础目录
-    items: list[Item]  # Item列表
-
-    items_relative: Optional[list] = Field([], exclude=True)  # Item列表相对路径
-
-    def in_items(self, path) -> bool:
-        """判断path是否在items中"""
-        if not self.items_relative:
-            self.items_relative = [
-                i.full_name.relative_to(self.base_path) for i in self.items
-            ]
-        return path in self.items_relative
-
-
 class SyncJob(BaseModel):
     """同步任务"""
 
     alist_info: AlistServer  # Alist Info
-    sync_dirs: dict[str, SyncDir] = {}  # 同步目录
 
 
 class Config(BaseModel):
