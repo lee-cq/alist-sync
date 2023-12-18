@@ -3,9 +3,8 @@ import logging
 import os
 
 from alist_sync.alist_client import AlistClient
-from alist_sync.common import sha1_6, timeout_input
-from alist_sync.config import cache_dir
-from alist_sync.models import SyncJob, AlistServer
+from alist_sync.common import timeout_input
+from alist_sync.models import AlistServer
 
 logger = logging.getLogger("alist-sync.base")
 
@@ -18,13 +17,7 @@ class SyncBase:
 
         self.sync_dirs = sync_dirs
         self.sync_dirs.sort()
-
-        self.sync_task_cache_file = cache_dir.joinpath(
-            f"sync_task_{sha1_6(self.sync_dirs)}.json"
-        )
-        self.sync_job = SyncJob(
-            alist_info=alist_info,
-        )
+        self.alist_info = alist_info
 
     async def create_storages(self, storages):
         """创建后端存储"""
@@ -49,4 +42,4 @@ class SyncBase:
         asyncio.run(self.async_run())
 
     async def async_run(self):
-        await self.create_storages(self.sync_job.alist_info.storages())
+        await self.create_storages(self.alist_info.storages())

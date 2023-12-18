@@ -3,6 +3,7 @@ from pathlib import PurePosixPath
 from alist_sdk import Item
 from pydantic import BaseModel
 
+from alist_sync.alist_client import AlistClient
 from alist_sync.scanner import Scanner
 
 
@@ -32,7 +33,7 @@ class Checker(BaseModel):
         )
 
     def model_dump_table(self):
-        """"""
+        """Table 打印"""
         from rich.console import Console
         from rich.table import Table
 
@@ -52,18 +53,6 @@ class Checker(BaseModel):
         console.print(table)
 
 
-if __name__ == "__main__":
-    import json
-    from pathlib import Path
-
-    checker = Checker.checker(
-        *[
-            ScannedDir(**s)
-            for s in json.load(
-                Path(__file__)
-                .parent.parent.joinpath("tests/resource/SyncDirs-m.json")
-                .open()
-            )
-        ]
-    )
-    checker.model_dump_table()
+async def check_dir(*dirs, client: AlistClient) -> Checker:
+    """"""
+    return Checker.checker(await Scanner.scan_dirs(*dirs, client=client))

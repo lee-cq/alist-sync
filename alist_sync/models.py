@@ -1,16 +1,13 @@
 import datetime
 import json
-from functools import cached_property
 from pathlib import PurePosixPath, Path
 from typing import Optional
 
-from alist_sdk import Item
-from pydantic import BaseModel as _BaseModel, Field
+from pydantic import BaseModel as _BaseModel
 
 __all__ = [
     "BaseModel",
     "AlistServer",
-    "SyncJob",
 ]
 
 from alist_sync.config import cache_dir
@@ -89,12 +86,6 @@ class AlistServer(BaseModel):
                     _load_storages,
                 ]
             raise KeyError("给定的")
-
-
-class SyncJob(BaseModel):
-    """同步任务"""
-
-    alist_info: AlistServer  # Alist Info
 
 
 class Config(BaseModel):
