@@ -1,10 +1,11 @@
 import logging
 
 from alist_sync.base_sync import SyncBase
-from alist_sync.checker import Checker
+from alist_sync.checker import check_dir
 from alist_sync.common import async_all_task_names
 from alist_sync.job_copy import CopyJob
 from alist_sync.models import AlistServer
+from alist_sync.scanner import scan_dirs
 
 logger = logging.getLogger("alist-sync.copy-to-target")
 
@@ -22,7 +23,7 @@ class Copy(SyncBase):
     async def async_run(self):
         """异步运行"""
         await super().async_run()
-        checker = Checker.checker(*self.sync_job.sync_dirs.values())
+        checker = await check_dir(*self.sync_dirs, client=self.client)
         copy_job = CopyJob.from_checker(self.source_path, self.targets_path, checker)
         await copy_job.start(self.client)
         logger.info("当前全部的Task %s", async_all_task_names())

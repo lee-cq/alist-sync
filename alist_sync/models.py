@@ -3,14 +3,36 @@ import json
 from pathlib import PurePosixPath, Path
 from typing import Optional
 
-from alist_sdk import Item
-from pydantic import BaseModel, Field
+from pydantic import BaseModel as _BaseModel
 
 __all__ = [
+    "BaseModel",
     "AlistServer",
-    "SyncDir",
-    "SyncJob",
 ]
+
+from alist_sync.config import cache_dir
+
+
+class BaseModel(_BaseModel):
+    """基础模型"""
+
+    @classmethod
+    def from_json_file(cls, file: Path):
+        """从文件中读取json"""
+        if not file.exists():
+            raise FileNotFoundError(f"找不到文件：{file}")
+        return cls.model_validate_json(Path(file).read_text(encoding="utf-8"))
+
+    @classmethod
+    def from_cache(cls):
+        class_name = cls.__name__
+        file = cache_dir.joinpath(f"{class_name}.json")
+        return cls.from_json_file(file)
+
+    def save_to_cache(self):
+        class_name = self.__class__.__name__
+        file = cache_dir.joinpath(f"{class_name}.json")
+        file.write_text(self.model_dump_json(indent=2), encoding="utf-8")
 
 
 class AlistServer(BaseModel):
@@ -64,30 +86,6 @@ class AlistServer(BaseModel):
                     _load_storages,
                 ]
             raise KeyError("给定的")
-
-
-class SyncDir(BaseModel):
-    """同步目录模型，定义一个同步目录"""
-
-    base_path: str  # 同步基础目录
-    items: list[Item]  # Item列表
-
-    items_relative: Optional[list] = Field([], exclude=True)  # Item列表相对路径
-
-    def in_items(self, path) -> bool:
-        """判断path是否在items中"""
-        if not self.items_relative:
-            self.items_relative = [
-                i.full_name.relative_to(self.base_path) for i in self.items
-            ]
-        return path in self.items_relative
-
-
-class SyncJob(BaseModel):
-    """同步任务"""
-
-    alist_info: AlistServer  # Alist Info
-    sync_dirs: dict[str, SyncDir] = {}  # 同步目录
 
 
 class Config(BaseModel):

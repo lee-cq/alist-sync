@@ -5,7 +5,7 @@ cd "$(dirname "$0")" || exit
 mkdir -p alist
 cd alist || exit
 
-VERSION=${ALIST_VERSION:-"v3.29.1"}
+VERSION=${ALIST_VERSION:-"3.29.1"}
 
 
 platform=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -20,7 +20,7 @@ case $(uname -m) in
   aarch64 | arm64)        cpu="arm64"        ;;
 esac
 filename="alist-${platform}-${cpu}${fix}"
-export download_url="https://github.com/alist-org/alist/releases/download/${VERSION}/${filename}"
+export download_url="https://github.com/alist-org/alist/releases/download/v${VERSION}/${filename}"
 
 if [ ! -f alist ]; then
   set -e

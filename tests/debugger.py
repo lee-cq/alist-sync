@@ -3,13 +3,14 @@ import logging.config
 import os
 import time
 from pathlib import Path
+import asyncio
 
+import rich
 from alist_sdk import Client
 
+from alist_sync.alist_client import AlistClient
 from alist_sync.config import cache_dir
-from alist_sync.models import AlistServer
 from common import create_storage_local, clear_dir
-from alist_sync.run_mirror import Mirror
 
 
 WORKDIR = Path(__file__).parent
@@ -141,13 +142,17 @@ for i in items_2:
     Path(DATA_DIR_DST / i).touch()
 
 
-Mirror(
-    AlistServer(
+if __name__ == "__main__":
+    from alist_sync.scanner import scan_dirs, Scanner
+
+    client = AlistClient(
         base_url="http://localhost:5244",
         verify=False,
         username="admin",
         password="123456",
-    ),
-    source_path="/local",
-    targets_path=["/local_dst", "/local_dst2"],
-).run()
+    )
+
+    d: Scanner = asyncio.run(scan_dirs("/local", "/local_dst", client=client))
+    rich.print(
+        d.items,
+    )

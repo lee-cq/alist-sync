@@ -1,51 +1,22 @@
-import os
-import time
 from pathlib import Path
 
 import asyncio
 
-from alist_sdk import Client, Item
+from alist_sdk import Item
 
 from alist_sync.alist_client import AlistClient
-from alist_sync.models import AlistServer, SyncDir
-from alist_sync.scan_dir import scan_dir
+from alist_sync.models import AlistServer
+from alist_sync.scanner import scan_dirs, Scanner
 from alist_sync.run_copy import Copy
 from alist_sync.run_mirror import Mirror
-from alist_sync.config import cache_dir
 
-from .common import create_storage_local, clear_dir
-
-WORKDIR = Path(__file__).parent
-DATA_DIR = WORKDIR / "alist/test_dir"
-DATA_DIR_DST = WORKDIR / "alist/test_dir_dst"
-DATA_DIR_DST2 = WORKDIR / "alist/test_dir_dst2"
-
-
-def setup_module():
-    print("setup_module")
-    assert os.system(f"bash {WORKDIR}/init_alist.sh") == 0
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    DATA_DIR_DST.mkdir(parents=True, exist_ok=True)
-    DATA_DIR_DST2.mkdir(parents=True, exist_ok=True)
-    time.sleep(2)
-    _client = Client(
-        "http://localhost:5244", verify=False, username="admin", password="123456"
-    )
-    create_storage_local(_client, mount_name="/local", local_path=DATA_DIR)
-    create_storage_local(_client, mount_name="/local_dst", local_path=DATA_DIR_DST)
-    create_storage_local(_client, mount_name="/local_dst2", local_path=DATA_DIR_DST2)
-
-
-def setup_function():
-    print("setup_function")
-    clear_dir(DATA_DIR)
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    clear_dir(DATA_DIR_DST)
-    DATA_DIR_DST.mkdir(parents=True, exist_ok=True)
-    clear_dir(DATA_DIR_DST2)
-    DATA_DIR_DST2.mkdir(parents=True, exist_ok=True)
-    clear_dir(cache_dir)
-    cache_dir.mkdir(parents=True, exist_ok=True)
+from .common import (
+    DATA_DIR,
+    DATA_DIR_DST,
+    DATA_DIR_DST2,
+    setup_module,
+    setup_function,
+)
 
 
 def test_scan_dir():
@@ -57,27 +28,27 @@ def test_scan_dir():
         "e.txt",
     ]
     for i in items:
-        Path(DATA_DIR / i).parent.mkdir(parents=True, exist_ok=True)
-        Path(DATA_DIR / i).touch()
+        Path(DATA_DIR.fs_path / i).parent.mkdir(parents=True, exist_ok=True)
+        Path(DATA_DIR.fs_path / i).touch()
 
     res = asyncio.run(
-        scan_dir(
-            AlistClient(
-                base_url="http://localhost:5244",
-                verify=False,
-                username="admin",
-                password="123456",
-            ),
-            "/local",
-        )
+        scan_dirs("/local", client=AlistClient(
+            base_url="http://localhost:5244",
+            verify=False,
+            username="admin",
+            password="123456",
+        ))
     )
 
-    assert isinstance(res, SyncDir)
-    assert res.base_path == "/local"
-    assert isinstance(res.items, list)
-    assert res.items.__len__() == len(items)
-    assert isinstance(res.items[0], Item)
-    assert {i.full_name.as_posix() for i in res.items} == {f"/local/{i}" for i in items}
+    assert isinstance(res, Scanner)
+    assert DATA_DIR.mount_path in res.items
+    assert isinstance(res.items, dict)
+    assert isinstance(res.items[DATA_DIR.mount_path], list)
+    assert res.items[DATA_DIR.mount_path].__len__() == len(items)
+    assert isinstance(res.items[DATA_DIR.mount_path][0], Item)
+    assert {i.full_name.as_posix() for vs in res.items.values() for i in vs} == {
+        f"{DATA_DIR.mount_path}/{i}" for i in items
+    }
 
 
 def test_run_copy():
@@ -89,8 +60,8 @@ def test_run_copy():
         "e.txt",
     ]
     for i in items:
-        Path(DATA_DIR / i).parent.mkdir(parents=True, exist_ok=True)
-        Path(DATA_DIR / i).touch()
+        Path(DATA_DIR.fs_path / i).parent.mkdir(parents=True, exist_ok=True)
+        Path(DATA_DIR.fs_path / i).touch()
 
     asyncio.run(
         Copy(
@@ -104,8 +75,8 @@ def test_run_copy():
             targets_path=["/local_dst", "/local_dst2"],
         ).async_run()
     )
-    assert DATA_DIR_DST.joinpath("test_scan_dir/a/a.txt").exists()
-    assert DATA_DIR_DST2.joinpath("test_scan_dir/a/a.txt").exists()
+    assert DATA_DIR_DST.fs_path.joinpath("test_scan_dir/a/a.txt").exists()
+    assert DATA_DIR_DST2.fs_path.joinpath("test_scan_dir/a/a.txt").exists()
 
 
 def test_mirror():
@@ -124,23 +95,23 @@ def test_mirror():
     }
 
     for i in items_sou:
-        Path(DATA_DIR / i).parent.mkdir(parents=True, exist_ok=True)
-        Path(DATA_DIR / i).touch()
+        Path(DATA_DIR.fs_path / i).parent.mkdir(parents=True, exist_ok=True)
+        Path(DATA_DIR.fs_path / i).touch()
     for i in items_tar1:
-        Path(DATA_DIR_DST / i).parent.mkdir(parents=True, exist_ok=True)
-        Path(DATA_DIR_DST / i).touch()
+        Path(DATA_DIR_DST.fs_path / i).parent.mkdir(parents=True, exist_ok=True)
+        Path(DATA_DIR_DST.fs_path / i).touch()
     for i in items_tar2:
-        Path(DATA_DIR_DST2 / i).parent.mkdir(parents=True, exist_ok=True)
-        Path(DATA_DIR_DST2 / i).touch()
+        Path(DATA_DIR_DST2.fs_path / i).parent.mkdir(parents=True, exist_ok=True)
+        Path(DATA_DIR_DST2.fs_path / i).touch()
 
-    assert not DATA_DIR_DST.joinpath("test_scan_dir/b/b.txt").exists()
-    assert not DATA_DIR_DST2.joinpath("test_scan_dir/b/b.txt").exists()
+    assert not DATA_DIR_DST.fs_path.joinpath("test_scan_dir/b/b.txt").exists()
+    assert not DATA_DIR_DST2.fs_path.joinpath("test_scan_dir/b/b.txt").exists()
 
-    assert DATA_DIR_DST.joinpath("tar1/b.txt").exists()
-    assert DATA_DIR_DST.joinpath("f.txt").exists()
+    assert DATA_DIR_DST.fs_path.joinpath("tar1/b.txt").exists()
+    assert DATA_DIR_DST.fs_path.joinpath("f.txt").exists()
 
-    assert DATA_DIR_DST2.joinpath("tar2/g.txt").exists()
-    assert DATA_DIR_DST2.joinpath("g.txt").exists()
+    assert DATA_DIR_DST2.fs_path.joinpath("tar2/g.txt").exists()
+    assert DATA_DIR_DST2.fs_path.joinpath("g.txt").exists()
 
     asyncio.run(
         Mirror(
@@ -150,16 +121,16 @@ def test_mirror():
                 username="admin",
                 password="123456",
             ),
-            source_path="/local",
-            targets_path=["/local_dst", "/local_dst2"],
+            source_path=DATA_DIR.mount_path,
+            targets_path=[DATA_DIR_DST.mount_path, DATA_DIR_DST2.mount_path],
         ).async_run()
     )
 
-    assert DATA_DIR_DST.joinpath("test_scan_dir/a/a.txt").exists()
-    assert DATA_DIR_DST2.joinpath("test_scan_dir/a/a.txt").exists()
+    assert DATA_DIR_DST.fs_path.joinpath("test_scan_dir/a/a.txt").exists()
+    assert DATA_DIR_DST2.fs_path.joinpath("test_scan_dir/a/a.txt").exists()
 
-    assert not DATA_DIR_DST.joinpath("tar1/b.txt").exists()
-    assert not DATA_DIR_DST.joinpath("f.txt").exists()
+    assert not DATA_DIR_DST.fs_path.joinpath("tar1/b.txt").exists()
+    assert not DATA_DIR_DST.fs_path.joinpath("f.txt").exists()
 
-    assert not DATA_DIR_DST2.joinpath("tar2/g.txt").exists()
-    assert not DATA_DIR_DST2.joinpath("g.txt").exists()
+    assert not DATA_DIR_DST2.fs_path.joinpath("tar2/g.txt").exists()
+    assert not DATA_DIR_DST2.fs_path.joinpath("g.txt").exists()

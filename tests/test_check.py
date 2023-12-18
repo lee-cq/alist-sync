@@ -1,43 +1,44 @@
-import json
 from pathlib import Path, PurePosixPath
 
 import pytest
+from alist_sdk import Item
 
 from alist_sync.job_remove import RemoveJob
-from alist_sync.models import SyncDir
 from alist_sync.checker import Checker
 from alist_sync.job_copy import CopyJob
+from alist_sync.scanner import Scanner
 
 SUP_DIR = Path(__file__).parent.joinpath("resource")
 
 
 @pytest.mark.parametrize(
-    "scanned_dirs",
+    "scanner",
     [
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs.json").open())],
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs-m.json").open())],
+        Scanner.model_validate_json(SUP_DIR.joinpath("Scanner.json").read_text()),
+        Scanner.model_validate_json(SUP_DIR.joinpath("Scanner-m.json").read_text()),
     ],
 )
-def test_check(scanned_dirs):
-    cols = [PurePosixPath(i.base_path) for i in scanned_dirs]
-    checker: Checker = Checker.checker(*scanned_dirs)
+def test_check(scanner: Scanner):
+    cols = [PurePosixPath(base_path) for base_path, i in scanner.items.items()]
+    checker: Checker = Checker.checker(scanner)
     assert checker.matrix
     assert checker.cols == cols
 
 
 @pytest.mark.parametrize(
-    "scanned_dirs",
+    "scanner",
     [
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs.json").open())],
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs-m.json").open())],
+        Scanner.model_validate_json(SUP_DIR.joinpath("Scanner.json").read_text()),
+        Scanner.model_validate_json(SUP_DIR.joinpath("Scanner-m.json").read_text()),
     ],
 )
-def test_job_copy_1_1(scanned_dirs):
-    checker = Checker.checker(*scanned_dirs)
-    source = scanned_dirs[0].base_path
-    target = scanned_dirs[1].base_path
-    source_files = [i.full_name for i in scanned_dirs[0].items]
-    target_files = [i.full_name for i in scanned_dirs[1].items]
+def test_job_copy_1_1(scanner):
+    checker: Checker = Checker.checker(scanner)
+    keys = list(scanner.items.keys())
+    source = keys[0]
+    target = keys[1]
+    source_files = [_.full_name for _ in scanner.items.get(source)]
+    target_files = [_.full_name for _ in scanner.items.get(target)]
     job = CopyJob.from_checker(
         source=source,
         target=target,
@@ -50,18 +51,19 @@ def test_job_copy_1_1(scanned_dirs):
 
 
 @pytest.mark.parametrize(
-    "scanned_dirs",
+    "scanner",
     [
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs.json").open())],
-        [SyncDir(**s) for s in json.load(SUP_DIR.joinpath("SyncDirs-m.json").open())],
+        Scanner.model_validate_json(SUP_DIR.joinpath("Scanner.json").read_text()),
+        Scanner.model_validate_json(SUP_DIR.joinpath("Scanner-m.json").read_text()),
     ],
 )
-def test_job_delete_1_1(scanned_dirs):
-    checker = Checker.checker(*scanned_dirs)
-    source = scanned_dirs[1].base_path
-    target = scanned_dirs[0].base_path
-    source_files = [i.full_name for i in scanned_dirs[1].items]
-    target_files = [i.full_name for i in scanned_dirs[0].items]
+def test_job_delete_1_1(scanner):
+    checker: Checker = Checker.checker(scanner)
+    keys = list(scanner.items.keys())
+    source = keys[1]
+    target = keys[0]
+    source_files = [_.full_name for _ in scanner.items.get(source)]
+    target_files = [_.full_name for _ in scanner.items.get(target)]
     job = RemoveJob.from_checker(
         source=source,
         target=target,

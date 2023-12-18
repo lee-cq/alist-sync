@@ -12,7 +12,7 @@ import asyncio
 import logging
 
 from alist_sync.base_sync import SyncBase
-from alist_sync.checker import Checker
+from alist_sync.checker import check_dir
 from alist_sync.common import async_all_task_names
 from alist_sync.job_copy import CopyJob
 from alist_sync.job_remove import RemoveJob
@@ -33,7 +33,7 @@ class Mirror(SyncBase):
         # 创建复制列表
         await super().async_run()
 
-        checker = Checker.checker(*self.sync_job.sync_dirs.values())
+        checker = await check_dir(*self.sync_dirs, client=self.client)
         copy_job = CopyJob.from_checker(self.source_path, self.targets_path, checker)
         delete_job = RemoveJob.from_checker(
             self.source_path, self.targets_path, checker
