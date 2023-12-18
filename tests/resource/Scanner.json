@@ -1,7 +1,6 @@
-[
-   {
-    "base_path": "/onedrive/Music",
-    "items": [
+{
+  "items": {
+    "/onedrive/Music": [
       {
         "parent": "/onedrive/Music",
         "name": "check.py",
@@ -20680,11 +20679,8 @@
         "type": 3,
         "full_name": "/onedrive/Music/song/伍佰 And China Blue-爱你一万年.mp3"
       }
-    ]
-  },
-   {
-    "base_path": "/移动云盘/Music",
-    "items": [
+    ],
+    "/移动云盘/Music": [
       {
         "parent": "/移动云盘/Music/song",
         "name": "F.I.R.飞儿乐团-月牙湾.lrc",
@@ -26756,4 +26752,4 @@
       }
     ]
   }
-]
+}

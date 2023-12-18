@@ -19,7 +19,7 @@ from .common import (
     setup_function as _sf,
 )
 
-from alist_sync.scanner import scan_dir, Scanner
+from alist_sync.scanner import scan_dirs, Scanner
 
 setup_module = _sm
 setup_function = _sf
@@ -42,17 +42,13 @@ def test_scan_dir():
         Path(DATA_DIR_DST2.fs_path / i).touch()
 
     res = asyncio.run(
-        scan_dir(
-            DATA_DIR.mount_path,
-            DATA_DIR_DST.mount_path,
-            DATA_DIR_DST2.mount_path,
-            client=AlistClient(
+        scan_dirs(DATA_DIR.mount_path, DATA_DIR_DST.mount_path,
+                  DATA_DIR_DST2.mount_path, client=AlistClient(
                 base_url="http://localhost:5244",
                 verify=False,
                 username="admin",
                 password="123456",
-            ),
-        )
+            ))
     )
 
     assert isinstance(res, Scanner)

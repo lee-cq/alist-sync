@@ -4,7 +4,7 @@ from alist_sdk import Item
 from pydantic import BaseModel
 
 from alist_sync.alist_client import AlistClient
-from alist_sync.scanner import Scanner
+from alist_sync.scanner import Scanner, scan_dirs
 
 
 class Checker(BaseModel):
@@ -55,4 +55,6 @@ class Checker(BaseModel):
 
 async def check_dir(*dirs, client: AlistClient) -> Checker:
     """"""
-    return Checker.checker(await Scanner.scan_dirs(*dirs, client=client))
+    return Checker.checker(
+        await Scanner.scans(*dirs, client=client)
+    )

@@ -11,7 +11,7 @@ from alist_sync.common import get_alist_client
 
 logger = logging.getLogger("alist-sync.scan-dir")
 
-__all__ = ["scan_dir", "Scanner"]
+__all__ = ["scan_dirs", "Scanner"]
 
 
 class Scanner(BaseModel):
@@ -78,7 +78,7 @@ class Scanner(BaseModel):
                 return
 
 
-async def scan_dir(*scan_path, client: AlistClient = None) -> Scanner:
+async def scan_dirs(*scan_path, client: AlistClient = None) -> Scanner:
     """扫描目录"""
     client = client or get_alist_client()
     return await Scanner.scans(*scan_path, client=client)
