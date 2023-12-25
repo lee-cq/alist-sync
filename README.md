@@ -34,6 +34,13 @@ Alist 同步工具
 #### 工作原理：
 -s 指定的目录分别作为源目录，想其他的目录中发起copy命令, 首次运行后会生成配置文件，持久化保存，作为增量的识别文件。
 
+在每一个需要同步的目录创建.alist-sync-data（它不会被扫描器识别）
 
-
-
+    .alist-sync-data/
+        scanner/
+            time.time.json
+        sync-lockor.json
+    history/
+        file_path_MD5.history
+        file_path_MD5.history.json
+        ...

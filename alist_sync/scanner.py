@@ -15,6 +15,7 @@ __all__ = ["scan_dirs", "Scanner"]
 
 
 class Scanner(BaseModel):
+    # scan_path: list[item]
     items: dict[str | PurePosixPath, list[Item]]
 
     @classmethod
@@ -32,9 +33,9 @@ class Scanner(BaseModel):
 
     @classmethod
     async def scan(
-        cls,
-        path: str | PurePosixPath,
-        client: AlistClient,
+            cls,
+            path: str | PurePosixPath,
+            client: AlistClient,
     ) -> tuple[str, list[Item]]:
         """扫描目录"""
         _list: list[Item] = []
@@ -49,6 +50,11 @@ class Scanner(BaseModel):
             return __res.data.content or []
 
         async def get_files(_path):
+            _path = PurePosixPath(_path)
+            if _path.name == '.alist-sync-data':
+                logger.debug("跳过 .alist-sync-data ...")
+                return
+
             __res = await _retry(_path)
             for _item in __res:
                 _item: Item

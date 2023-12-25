@@ -32,6 +32,9 @@ def test_scan_dir():
         "test_scan_dir/c/c.txt",
         "test_scan_dir/d.txt",
         "e.txt",
+        ".alist-sync-data/sync-locker.json",
+        ".alist-sync-data/history/MD5.history",
+        ".alist-sync-data/history/MD5.history.json"
     ]
     for i in items:
         Path(DATA_DIR.fs_path / i).parent.mkdir(parents=True, exist_ok=True)
@@ -41,14 +44,22 @@ def test_scan_dir():
         Path(DATA_DIR_DST2.fs_path / i).parent.mkdir(parents=True, exist_ok=True)
         Path(DATA_DIR_DST2.fs_path / i).touch()
 
+    assert DATA_DIR_DST2.fs_path.joinpath(".alist-sync-data/sync-locker.json").exists()
+
     res = asyncio.run(
-        scan_dirs(DATA_DIR.mount_path, DATA_DIR_DST.mount_path,
-                  DATA_DIR_DST2.mount_path, client=AlistClient(
+        scan_dirs(
+            DATA_DIR.mount_path,
+            DATA_DIR_DST.mount_path,
+            DATA_DIR_DST2.mount_path,
+            client=AlistClient(
                 base_url="http://localhost:5244",
                 verify=False,
                 username="admin",
                 password="123456",
-            ))
+            ),
+        )
     )
 
     assert isinstance(res, Scanner)
+    assert 'sync-locker.json' not in [_.name for _ in res.items.get(DATA_DIR_DST2.mount_path)]
+    assert 'MD5.history' not in [_.name for _ in res.items.get(DATA_DIR_DST2.mount_path)]
