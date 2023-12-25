@@ -21,7 +21,7 @@ DATA_DIR_DST2 = StorageInfo("/local_dst2", WORKDIR / "alist/test_dir_dst2")
 
 def create_storage_local(client_, mount_name, local_path: Path):
     local_storage = {
-        "mount_path": f"/{mount_name}",
+        "mount_path": f"{mount_name}",
         "order": 0,
         "driver": "Local",
         "cache_expiration": 0,
@@ -40,7 +40,7 @@ def create_storage_local(client_, mount_name, local_path: Path):
         "webdav_policy": "native_proxy",
         "down_proxy_url": "",
     }
-    if f"/{mount_name}" not in [
+    if f"{mount_name}" not in [
         i["mount_path"]
         for i in client_.get("/api/admin/storage/list").json()["data"]["content"]
     ]:

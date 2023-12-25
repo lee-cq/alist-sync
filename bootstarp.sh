@@ -10,7 +10,7 @@ all_clear() {
     echo ".cache"
     rm -rf alist_sync/.cache alist_sync.egg-info
     echo "alist-test-dir"
-    rm -rf tests/alist/test_*
+    rm -rf tests/alist/test_* tests/alist/data tests/alist/daemon
 }
 
 case $1 in
