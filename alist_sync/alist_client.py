@@ -109,3 +109,13 @@ async def get_status(
         return _task_undone[task_name].status, _task_undone[task_name].progress
     else:
         raise ValueError(f"任务不存在: {task_name}")
+
+
+if __name__ == "__main__":
+    _c = AlistClient(
+        base_url="http://localhost:5244",
+        username="admin",
+        password="123456",
+        verify=False,
+    )
+    asyncio.run(_c.me())

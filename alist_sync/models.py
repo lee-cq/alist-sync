@@ -51,6 +51,9 @@ class AlistServer(BaseModel):
     verify: Optional[bool] = True
     headers: Optional[dict] = None
 
+    def dump_for_sdk(self):
+        return self.model_dump(exclude={"storage_config"})
+
     def storages(self) -> list[dict]:
         """返回给定的 storage_config 中包含的storages"""
 

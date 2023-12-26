@@ -4,11 +4,9 @@ from typing import Literal, Optional, Iterator
 
 from pydantic import computed_field
 
-from alist_sync.alist_client import AlistClient, get_status
-from alist_sync.models import BaseModel
+from alist_sync.alist_client import get_status
 from alist_sync.checker import Checker
-from alist_sync.common import get_alist_client
-from alist_sync.jobs import JobBase
+from alist_sync.jobs import JobBase, TaskBase
 
 logger = logging.getLogger("alist-sync.job_copy")
 
@@ -25,7 +23,7 @@ CopyStatusModify = Literal[
 ]
 
 
-class CopyTask(BaseModel):
+class CopyTask(TaskBase):
     """复制任务"""
 
     id: Optional[str] = None  # 创建任务后，Alist返回的任务ID  # 一个复制任务，对应对应了2个Alist任务
@@ -55,12 +53,12 @@ class CopyTask(BaseModel):
 
         return f"copy [{source_provider}](/{source_path}) to [{target_provider}](/{_t})"
 
-    async def create(self, client: AlistClient = None):
+    async def create(self):
         """创建复制任务"""
-        client = client or get_alist_client()
         if self.status != "init":
             raise ValueError(f"任务状态错误: {self.status}")
-        _res = await client.copy(
+        assert await self.backup(self.copy_target.joinpath(self.name)), "BackupError"
+        _res = await self.client.copy(
             files=[
                 self.copy_name,
             ],
@@ -70,10 +68,9 @@ class CopyTask(BaseModel):
         if _res.code == 200:
             self.status = "created"
 
-    async def recheck_done(self, client: AlistClient = None) -> bool:
+    async def recheck_done(self) -> bool:
         """检查任务复制到文件是否已经存在与目标位置"""
-        client = client or get_alist_client()
-        _res = await client.get_item_info(
+        _res = await self.client.get_item_info(
             str(self.copy_target.joinpath(self.copy_name))
         )
         if _res.code == 200 and _res.data.name == self.copy_name:
@@ -84,7 +81,7 @@ class CopyTask(BaseModel):
             self.status = "failed"
             return False
 
-    async def check_status(self, client: AlistClient = None) -> bool:
+    async def check_status(self) -> bool:
         """异步运行类 - 检查该Task的状态
 
         在异步循环中反复检查
@@ -95,15 +92,14 @@ class CopyTask(BaseModel):
         4. 检查任务已经完成                   :: running -> success
         5. 复查任务是否已经完成               :: success -> checked_done
         """
-        client = client or get_alist_client()
 
         if self.status == "init":
             logger.debug("创建任务: %s", self.name)
-            return await self.create(client)
+            return await self.create()
         elif self.status == "checked_done":
             return True
         elif self.status == "success":
-            return await self.recheck_done(client)
+            return await self.recheck_done()
         try:
             _status, _p = await get_status(self.name)
             self.status = _status
@@ -133,4 +129,5 @@ class CopyJob(JobBase):
                     copy_name=pp.get(_s).name,
                     copy_source=PurePosixPath(_s).joinpath(r_path.parent),
                     copy_target=PurePosixPath(_t).joinpath(r_path.parent),
+                    backup_dir=_t.joinpath(".alist-sync-data/history"),
                 )

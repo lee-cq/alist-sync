@@ -8,18 +8,90 @@
 """
 import asyncio
 import logging
+import os
 from pathlib import PurePosixPath
 from typing import Iterator
+
 
 from alist_sync.models import BaseModel
 from alist_sync.alist_client import AlistClient
 from alist_sync.checker import Checker
-from alist_sync.common import get_alist_client
+from alist_sync.common import get_alist_client, sha1
 
 logger = logging.getLogger("alist-sync.jobs")
 
 
+def get_need_backup_from_env() -> bool:
+    _b = os.environ.get("ALIST_SYNC_BACKUP", "F").upper()
+    if _b in ["Y", "YES", "TRUE", "OK"]:
+        return True
+    return False
+
+
+class TaskBase(BaseModel):
+    need_backup: bool = None
+    backup_status: str = "init"
+    backup_dir: PurePosixPath
+
+    @property
+    def client(self) -> AlistClient:
+        return get_alist_client()
+
+    async def backup(self, file: PurePosixPath):
+        """备份， move应该不会创建Task,会等待完成后返回。
+        包含创建元数据 sha1(file_path)_int(time.time()).history
+        """
+        if self.need_backup is None:
+            self.need_backup = get_need_backup_from_env()
+
+        if not self.need_backup:
+            return True
+
+        file_info = await self.client.get_item_info(file)
+        if file_info.code == 404:
+            logger.debug("目标文件不存在，无需备份")
+            return True
+        assert (
+            file_info.code == 200
+        ), f"BackupFileError: {file_info.code}:{file_info.message}"
+
+        history_filename = (
+            f"{sha1(str(file))}_{int(file_info.data.modified.timestamp())}.history"
+        )
+        assert (
+            self.backup_file_exist(history_filename) is False
+        ), f"{history_filename}已经存在"
+
+        res_bak = await self.client.move(
+            src_dir=file.parent,
+            dst_dir=self.backup_dir,
+            files=file.name,
+        )
+        assert res_bak.code == 200, f"移动状态, {res_bak.message}"
+        res_meta = await self.client.upload_file_put(
+            file_info.model_dump_json().encode(),
+            path=self.backup_dir.joinpath(history_filename + ".json"),
+        )
+        assert res_meta.code == 200
+
+        return self.backup_file_exist(history_filename)
+
+    async def backup_file_exist(self, history_filename) -> bool:
+        """验证Backup file 是否已经存在"""
+        h_info = await self.client.get_item_info(
+            self.backup_dir.joinpath(history_filename)
+        )
+        hj_info = await self.client.get_item_info(
+            self.backup_dir.joinpath(history_filename + ".json")
+        )
+        if hj_info.code == 200 and h_info.code == 200:
+            return True
+        return False
+
+
 class JobBase(BaseModel):
+    """"""
+
     @staticmethod
     def create_task(_s, _t, checker: Checker) -> Iterator[BaseModel]:
         raise NotImplementedError
