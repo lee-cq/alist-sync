@@ -14,7 +14,7 @@ logger = logging.getLogger("alist-sync.base")
 class SyncBase:
     def __init__(self, alist_info: AlistServer, sync_dirs: list[str | os.PathLike]):
         self.client = AlistClient(timeout=30, **alist_info.dump_for_sdk())
-        self._client = Client(timeout=30, **alist_info.dump_for_sdk())
+        # self._client = Client(timeout=30, **alist_info.dump_for_sdk())
 
         self.sync_dirs = sync_dirs
         self.sync_dirs.sort()

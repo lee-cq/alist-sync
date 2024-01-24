@@ -8,8 +8,8 @@ from alist_sync.checker import Checker
 from alist_sync.job_copy import CopyTask, CopyJob
 from alist_sync.job_remove import RemoveTask, RemoveJob
 from alist_sync.scanner import Scanner
-from test_check import SUP_DIR
 
+from .test_check import SUP_DIR
 from .common import setup_module as _sm, setup_function as _sf, DATA_DIR, DATA_DIR_DST
 
 
@@ -60,8 +60,8 @@ def test_copy_task(need_backup):
 
     asyncio.run(start())
     assert DATA_DIR_DST.fs_path.joinpath("a.txt").read_text() == "123"
-    # if need_backup:
-    #     assert DATA_DIR_DST.fs_path.joinpath(".alist-sync-data").is_dir()
+    if need_backup:
+        assert DATA_DIR_DST.fs_path.joinpath(".alist-sync-data").is_dir()
 
 
 @pytest.mark.parametrize(

@@ -30,12 +30,12 @@ class AlistClient(_AsyncClient):
     def __init__(
         self,
         base_url,
-        max_connect=30,
         *,
         token=None,
         username=None,
         password=None,
         has_opt=False,
+        max_connect=30,
         **kwargs,
     ):
         super().__init__(
@@ -63,7 +63,7 @@ class AlistClient(_AsyncClient):
             return await super().request(*args, **kwargs)
 
     @staticmethod
-    def __task_rtype(rtype, data):
+    def _task_rtype(rtype, data):
         if rtype == list:
             return data or []
         return {i.name: i for i in data or []}
@@ -75,7 +75,7 @@ class AlistClient(_AsyncClient):
         """获取已完成的任务"""
         res = await self.task_done(task_type)
         if res.code == 200:
-            return timestamp * 5, self.__task_rtype(rtype, res.data)
+            return timestamp * 5, self._task_rtype(rtype, res.data)
         raise ValueError(f"获取已完成的任务失败: {res.code = } {res.message = }")
 
     @lru_cache(maxsize=1)
@@ -85,7 +85,7 @@ class AlistClient(_AsyncClient):
         """获取未完成的任务"""
         res = await self.task_undone(task_type)
         if res.code == 200:
-            return timestamp * 5, self.__task_rtype(rtype, res.data)
+            return timestamp * 5, self._task_rtype(rtype, res.data)
         raise ValueError(f"获取未完成的任务失败: {res.code = } {res.message = }")
 
 

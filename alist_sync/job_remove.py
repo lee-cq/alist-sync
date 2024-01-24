@@ -15,6 +15,10 @@ CopyStatusModify = Literal[
 ]
 
 
+class BackupTask(TaskBase):
+    """备份文件"""
+
+
 class RemoveTask(TaskBase):
     """删除文件的任务"""
 
@@ -52,7 +56,8 @@ class RemoveTask(TaskBase):
     async def check_status(self) -> bool:
         """检查任务状态"""
         if self.status == "init":
-            return await self.remove()
+            if await self.backup(self.full_path):
+                return await self.remove()
         elif self.status == "removed":
             return await self.recheck()
         elif self.status == "checked_done":

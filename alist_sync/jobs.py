@@ -45,36 +45,43 @@ class TaskBase(BaseModel):
             self.need_backup = get_need_backup_from_env()
 
         if not self.need_backup:
+            logger.info("Not Need Backup!")
             return True
 
         file_info = await self.client.get_item_info(file)
         if file_info.code == 404:
             logger.debug("目标文件不存在，无需备份")
             return True
-        assert (
-            file_info.code == 200
-        ), f"BackupFileError: {file_info.code}:{file_info.message}"
+        if file_info.code != 200:
+            raise FileNotFoundError(
+                f"BackupFileError: {file} -> {file_info.code}:{file_info.message}"
+            )
 
         history_filename = (
             f"{sha1(str(file))}_{int(file_info.data.modified.timestamp())}.history"
         )
-        assert (
-            self.backup_file_exist(history_filename) is False
-        ), f"{history_filename}已经存在"
+        if await self.backup_file_exist(history_filename) is True:
+            raise FileExistsError(f"{history_filename}已经存在")
 
+        logger.info("Backup File: {file}")
         res_bak = await self.client.move(
             src_dir=file.parent,
             dst_dir=self.backup_dir,
             files=file.name,
         )
-        assert res_bak.code == 200, f"移动状态, {res_bak.message}"
+        assert res_bak.code == 200, f"移动文件错误: {res_bak.message}"
+        res_rename = await self.client.rename(
+            history_filename, full_path=self.backup_dir.joinpath(file.name)
+        )
+        assert res_rename.code == 200, f"重命名错误: {res_rename.message}"
         res_meta = await self.client.upload_file_put(
             file_info.model_dump_json().encode(),
             path=self.backup_dir.joinpath(history_filename + ".json"),
         )
         assert res_meta.code == 200
-
-        return self.backup_file_exist(history_filename)
+        if (await self.backup_file_exist(history_filename)) is False:
+            raise FileNotFoundError(f"{history_filename}")
+        return True
 
     async def backup_file_exist(self, history_filename) -> bool:
         """验证Backup file 是否已经存在"""
@@ -131,14 +138,14 @@ class JobBase(BaseModel):
         return cls(tasks=_tasks)
 
     async def start(self, client: AlistClient = None):
-        """开始复制任务"""
+        """开始任务"""
         logger.info(f"[{self.__class__.__name__}] " f"任务开始。")
         client = client or get_alist_client()
         while self.tasks:
             _keys = [k for k in self.tasks.keys()]
-            for t_name in _keys:
-                task = self.tasks[t_name]
-                _task_status = await task.check_status(client=client)
+            for task_name in _keys:
+                task = self.tasks[task_name]
+                _task_status = await task.check_status()
 
                 if _task_status:
                     logger.info(

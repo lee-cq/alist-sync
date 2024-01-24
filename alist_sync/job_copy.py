@@ -57,7 +57,6 @@ class CopyTask(TaskBase):
         """创建复制任务"""
         if self.status != "init":
             raise ValueError(f"任务状态错误: {self.status}")
-        assert await self.backup(self.copy_target.joinpath(self.name)), "BackupError"
         _res = await self.client.copy(
             files=[
                 self.copy_name,
@@ -94,8 +93,9 @@ class CopyTask(TaskBase):
         """
 
         if self.status == "init":
-            logger.debug("创建任务: %s", self.name)
-            return await self.create()
+            logger.info("创建任务: %s", self.name)
+            if await self.backup(self.copy_target.joinpath(self.copy_name)):
+                return await self.create()
         elif self.status == "checked_done":
             return True
         elif self.status == "success":
@@ -104,8 +104,8 @@ class CopyTask(TaskBase):
             _status, _p = await get_status(self.name)
             self.status = _status
             return False
-        except ValueError:
-            logger.error("获取任务状态失败: %s", self.name)
+        except ValueError as _e:
+            logger.error("获取任务状态失败: %s", self.name, exc_info=_e)
             self.status = "failed"
             return False
 
