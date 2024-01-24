@@ -5,7 +5,7 @@ cd "$(dirname "$0")" || exit
 mkdir -p alist
 cd alist || exit
 
-VERSION=${ALIST_VERSION:-"3.29.1"}
+VERSION=${ALIST_VERSION:-"3.30.0"}
 
 
 platform=$(uname -s | tr '[:upper:]' '[:lower:]')
