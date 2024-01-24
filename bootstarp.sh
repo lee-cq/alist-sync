@@ -5,7 +5,7 @@ cd "$(dirname "$0")" || exit 1
 all_clear() {
     echo ".pytest_cache"
     find . -type d -name ".pytest_cache" -exec rm -rf {} \; 2>/dev/null
-    echo  "__pycache__"
+    echo "__pycache__"
     find . -type d -name "__pycache__" -exec rm -rf {} \; 2>/dev/null
     echo ".cache"
     rm -rf alist_sync/.cache alist_sync.egg-info
@@ -14,58 +14,67 @@ all_clear() {
 }
 
 case $1 in
-install ) 
+install)
     pip install -U pip
     pip install -e .
-    pip install  git+https://github.com/lee-cq/alist-sdk --no-cache-dir --force-reinstall
+    pip install git+https://github.com/lee-cq/alist-sdk --no-cache-dir --force-reinstall
     ;;
 
-alist-init ) 
+alist)
+    cd tests/alist || {
+        echo "Error: tests/alist not find "
+        exit 1
+    }
+    shift
+    ./alist "$@"
+    ;;
+
+alist-init)
     pkill alist
     rm -rf tests/alist
     tests/init_alist.sh
     ;;
 
-alist-version )
-    cd tests/alist  || {
+alist-version)
+    cd tests/alist || {
         echo "未初始化 -  执行 alist-init"
         exit 2
     }
     ./alist version
     ;;
 
-alist-run )
-    cd tests/alist  || {
+alist-run)
+    cd tests/alist || {
         echo "未初始化 -  执行 alist-init"
         exit 2
     }
     ./alist restart
     ;;
 
-alist-stop ) 
+alist-stop)
     ./tests/alist/alist stop || pkill alist
     ;;
 
-clear )  
-    all_clear 
+clear)
+    all_clear
     ;;
 
-test ) 
+test)
     whereis pytest || pip install pytest
     clear
-    pkill alist
+    ./tests/alist/alist stop || pkill alist
     all_clear
     shift 1
     pytest -v "$@"
     ;;
 
-debugger )
+debugger)
     all_clear
     clear
     python3 tests/debugger.py
     ;;
 
-* )
+*)
     echo "Usage: $0 {install|alist-init|alist-version|alist-run|alist-stop|clear|debugger|test}"
     exit 1
     ;;

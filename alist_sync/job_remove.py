@@ -2,12 +2,10 @@ import logging
 from pathlib import PurePosixPath
 from typing import Iterator, Literal
 
-from pydantic import BaseModel
-
 from alist_sync.alist_client import AlistClient
 from alist_sync.checker import Checker
 from alist_sync.common import get_alist_client
-from alist_sync.jobs import JobBase
+from alist_sync.jobs import JobBase, TaskBase
 
 logger = logging.getLogger("alist-sync.job_remove")
 CopyStatusModify = Literal[
@@ -17,7 +15,11 @@ CopyStatusModify = Literal[
 ]
 
 
-class RemoveTask(BaseModel):
+class BackupTask(TaskBase):
+    """备份文件"""
+
+
+class RemoveTask(TaskBase):
     """删除文件的任务"""
 
     full_path: PurePosixPath | str
@@ -28,10 +30,11 @@ class RemoveTask(BaseModel):
     def name(self) -> str | PurePosixPath:
         return self.full_path
 
-    async def remove(self, client: AlistClient = None):
+    async def remove(self):
         """删除文件"""
-        client = client or get_alist_client()
-        res = await client.remove(self.full_path.parent, self.full_path.name)
+        assert await self.backup(self.full_path), "Backup Error"
+
+        res = await self.client.remove(self.full_path.parent, self.full_path.name)
         if res.code == 200:
             logger.info("删除文件 %s 成功", self.full_path)
             self.status = "removed"
@@ -50,13 +53,13 @@ class RemoveTask(BaseModel):
         self.error_times += 1
         return False
 
-    async def check_status(self, client: AlistClient = None) -> bool:
+    async def check_status(self) -> bool:
         """检查任务状态"""
-        client = client or get_alist_client()
         if self.status == "init":
-            return await self.remove(client)
+            if await self.backup(self.full_path):
+                return await self.remove()
         elif self.status == "removed":
-            return await self.recheck(client)
+            return await self.recheck()
         elif self.status == "checked_done":
             return True
         else:
@@ -80,4 +83,7 @@ class RemoveJob(JobBase):
 
         for r_path, pp in checker.matrix.items():
             if pp.get(_s) is None and pp.get(_t) is not None:
-                yield RemoveTask(full_path=pp.get(_t).full_name)
+                yield RemoveTask(
+                    full_path=pp.get(_t).full_name,
+                    backup_dir=_t.joinpath(".alist-sync-data/history"),
+                )
