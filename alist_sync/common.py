@@ -46,7 +46,7 @@ def clear_cache():
     clear_path(cache_dir)
 
 
-def sha1(s):
+def sha1(s) -> str:
     return hashlib.sha1(str(s).encode()).hexdigest()
 
 
