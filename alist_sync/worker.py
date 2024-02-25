@@ -2,20 +2,12 @@ import atexit
 import datetime
 import logging
 from pathlib import Path
-from typing import Literal, Any, Annotated
+from typing import Literal, Any
 
-from pydantic import (
-    BaseModel,
-    computed_field,
-    Field,
-    AfterValidator,
-    PlainSerializer,
-    GetCoreSchemaHandler,
-)
-from pydantic_core import core_schema
+from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
 from pymongo.database import Database
-from alist_sdk.path_lib import AlistPath as _AlistPath
+from alist_sdk.path_lib import AlistPathType
 
 from alist_sync.config import cache_dir
 from alist_sync.common import sha1
@@ -35,32 +27,15 @@ WorkerStatus = Literal[
 logger = logging.getLogger("alist-sync.worker")
 
 
-class AlistPath(_AlistPath):
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        source_type: Any,
-        handler: GetCoreSchemaHandler,
-    ):
-        return core_schema.no_info_after_validator_function(cls, handler(source_type))
-
-
-A_AlistPath = Annotated[
-    AlistPath | str,
-    AfterValidator(lambda x: x if isinstance(x, AlistPath) else AlistPath(x)),
-    PlainSerializer(lambda x: x.as_uri(), return_type=str),
-]
-
-
 class Worker(BaseModel):
     owner: str
     created_at: datetime.datetime = datetime.datetime.now()
     type: WorkerType
     need_backup: bool
-    backup_dir: A_AlistPath | None = None
+    backup_dir: AlistPathType | None = None
 
-    source_path: A_AlistPath
-    target_path: A_AlistPath | None = None
+    source_path: AlistPathType
+    target_path: AlistPathType | None = None
     status: WorkerStatus = "init"
     error_info: BaseException | None = None
 

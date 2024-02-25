@@ -60,6 +60,7 @@ class Scanner(BaseModel):
                 _item: Item
                 _item.parent = _path
                 if _item.is_dir:
+                    # noinspection PyAsyncCall
                     asyncio.create_task(
                         get_files(_item.full_name),
                         name=f"scan_{_item.full_name}",
