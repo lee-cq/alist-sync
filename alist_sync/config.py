@@ -3,8 +3,8 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from functools import cached_property
-from typing import Optional
+from functools import cached_property, lru_cache
+from typing import Optional, Literal
 
 from alist_sdk import AlistPathType
 from pydantic import Field, BaseModel
@@ -41,8 +41,11 @@ class AlistServer(BaseModel):
     verify: Optional[bool] = True
     headers: Optional[dict] = None
 
-    def dump_for_sdk(self):
+    def dump_for_alist_client(self):
         return self.model_dump(exclude={"storage_config"})
+
+    def sump_for_sdk(self):
+        return self.model_dump(exclude={"storage_config", "max_connect"})
 
     def storages(self) -> list[dict]:
         """返回给定的 storage_config 中包含的storages"""
@@ -82,9 +85,30 @@ class AlistServer(BaseModel):
 
 
 class SyncGroup(BaseModel):
+    enable: bool = True
     name: str
     type: str
     group: list[AlistPathType] = Field(min_length=2)
+
+
+NotifyType = Literal["email", "webhook"]
+
+
+class EMailNotify(BaseModel):
+    enable: bool = True
+    type: NotifyType = "email"
+    smtp_host: str
+    smtp_port: int = 25
+    sender: str
+    password: str
+    recipients: list[str]
+
+
+class WebHookNotify(BaseModel):
+    enable: bool = True
+    type: NotifyType = "webhook"
+    webhook_url: str
+    headers: dict[str, str]
 
 
 class Config(BaseModel):
@@ -107,7 +131,11 @@ class Config(BaseModel):
         "1",
     )
 
+    runner_name: str = "test"
+
     mongodb_uri: str | None = os.getenv("ALIST_SYNC_MONGODB_URI", None)
+
+    notify: list[EMailNotify | WebHookNotify] = []
 
     alist_servers: list[AlistServer] = []
     sync_groups: list[SyncGroup] = []
@@ -118,6 +146,14 @@ class Config(BaseModel):
     def cache_dir(self) -> Path:
         self.cache__dir.mkdir(exist_ok=True, parents=True)
         return self.cache__dir
+
+    @lru_cache(10)
+    def get_server(self, base_url) -> AlistServer:
+        """找到AlistServer"""
+        for server in self.alist_servers:
+            if base_url == server.base_url:
+                return server
+        raise ModuleNotFoundError()
 
     @cached_property
     def mongodb(self) -> "Database":
@@ -163,3 +199,4 @@ if __name__ == "__main__":
     print(config)
     print(config.cache_dir)
     print(config.mongodb)
+    print(config.notify)

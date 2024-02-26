@@ -1,7 +1,9 @@
 import atexit
 import datetime
 import logging
+import threading
 from pathlib import Path
+from queue import Queue
 from typing import Literal, Any
 
 from pydantic import BaseModel, computed_field, Field
@@ -9,8 +11,11 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 from alist_sdk.path_lib import AlistPathType
 
-from alist_sync.config import cache_dir
+from alist_sync.config import create_config
 from alist_sync.common import sha1
+from alist_sync.thread_pool import MyThreadPoolExecutor
+
+sync_config = create_config()
 
 WorkerType = Literal["delete", "copy"]
 WorkerStatus = Literal[
@@ -28,7 +33,7 @@ logger = logging.getLogger("alist-sync.worker")
 
 
 class Worker(BaseModel):
-    owner: str
+    owner: str = sync_config.runner_name
     created_at: datetime.datetime = datetime.datetime.now()
     type: WorkerType
     need_backup: bool
@@ -55,7 +60,7 @@ class Worker(BaseModel):
 
     @property
     def tmp_file(self) -> Path:
-        return cache_dir.joinpath(f"download_tmp_{sha1(self.source_path)}")
+        return sync_config.cache_dir.joinpath(f"download_tmp_{sha1(self.source_path)}")
 
     def update(self, *field: Any):
         if self.status == "done" and self.workers is not None:
@@ -109,37 +114,41 @@ class Worker(BaseModel):
             self.delete_type()
 
 
-class Workers(BaseModel):
-    workers: list[Worker] = []
-    mongodb: Database
+class Workers:
+    # workers: list[Worker] = []
 
-    model_config = {"arbitrary_types_allowed": True}
-
-    def __init__(self, **data: Any):
-        super().__init__(**data)
+    def __init__(self, mongodb: Database = None):
+        self.mongodb: Database = mongodb or sync_config.mongodb
+        self.thread_pool = MyThreadPoolExecutor(
+            5,
+            "worker_",
+        )
 
         atexit.register(self.__del__)
 
     def __del__(self):
-        for i in cache_dir.iterdir():
+        for i in sync_config.cache_dir.iterdir():
             if i.name.startswith("download_tmp_"):
                 i.unlink(missing_ok=True)
 
     def load_from_mongo(self):
         """从MongoDB加载Worker"""
         for i in self.mongodb.workers.find():
-            self.workers.append(Worker(**i))
+            self.add_worker(Worker(**i))
 
     def add_worker(self, worker: Worker):
-        self.workers.append(worker)
+        worker.workers = self
+        worker.collection = self.mongodb.workers
+        self.thread_pool.submit(worker.run)
 
-    def del_worker(self, _id: str):
-        """删除Worker"""
-        pass
+    def run(self, queue: Queue):
+        while True:
+            self.add_worker(queue.get())
 
-    def run(self):
-        for worker in self.workers:
-            worker.run()
+    def start(self, queue: Queue) -> threading.Thread:
+        _t = threading.Thread(target=self.run, args=(queue,))
+        _t.start()
+        return _t
 
 
 if __name__ == "__main__":

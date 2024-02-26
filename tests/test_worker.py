@@ -11,11 +11,7 @@ import pytest
 
 from alist_sdk.path_lib import PureAlistPath, AlistPath, login_server
 
-from alist_sync.worker import Worker, Workers
-
-# 如果Python版本是3.12跳过模块
-if sys.version_info >= (3, 12):
-    pytest.skip("Skip this module on Python 3.12", allow_module_level=True)
+from alist_sync.d_worker import Worker, Workers
 
 
 def test_worker():

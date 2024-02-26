@@ -3,26 +3,26 @@ cache_dir: ./.cache
 daemon: false
 
 alist_servers:
-  - url: http://localhost:5244/
+  - base_url: http://localhost:5244/
     username: "admin"
     password: "123456"
     verify_ssl: false
-  - url: http://localhost:5245/
+  - base_url: http://localhost:5245/
     username: "admin"
     password: "admin"
 
 notify: # 通知服务，当触发一些异常后，将会发送通知。
-  email: # 邮件通知
-    enable: false
-    sender:
-      smtp: ""
-      email: ""
-      password: ""
+  - enable: false
+    type: email
+    smtp_host: ""
+    smtp_port: 25
+    sender: ""
+    password: ""
     recipients:
       - ""
 
-  feishu: # 飞书web Hook机器人
-    enable: false
+  - enable: false
+    type: webhook
     webhook_url: ""
     headers:
       K: V
@@ -30,6 +30,7 @@ notify: # 通知服务，当触发一些异常后，将会发送通知。
 
 sync_groups:
   - name: "sync1"
+    enable: true  # 默认值: True
     # 同步类型，一共4种：
     # 1 copy:如果目标目录中已经存在该文件，则跳过
     #        忽略存在与目标目录中但不存在于源目录中的文件
