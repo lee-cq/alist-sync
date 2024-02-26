@@ -9,7 +9,7 @@ from typer import Typer, Option, echo, style
 
 from alist_sync.base_sync import SyncBase
 from alist_sync.checker import check_dir
-from alist_sync.models import AlistServer
+from alist_sync.config import AlistServer
 from alist_sync.run_copy import Copy
 from alist_sync.run_mirror import Mirror
 from alist_sync.run_sync import Sync

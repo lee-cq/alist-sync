@@ -88,6 +88,8 @@ class SyncGroup(BaseModel):
     enable: bool = True
     name: str
     type: str
+    need_backup: bool = False
+    backup_dir: str = ".alist-sync-backup"
     group: list[AlistPathType] = Field(min_length=2)
 
 
@@ -195,8 +197,9 @@ class Config(BaseModel):
 
 
 if __name__ == "__main__":
-    config = create_config()
-    print(config)
-    print(config.cache_dir)
-    print(config.mongodb)
-    print(config.notify)
+    # config = create_config()
+    # print(config)
+    # print(config.cache_dir)
+    # print(config.mongodb)
+    # print(config.notify)
+    print(Config.model_json_schema())

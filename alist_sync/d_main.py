@@ -2,22 +2,18 @@
 """
 
 """
-import queue
-import threading
+
 from queue import Queue
-from alist_sync.thread_pool import MyThreadPoolExecutor
 
 from alist_sdk import AlistPath, login_server
 from alist_sdk.path_lib import ALIST_SERVER_INFO
 
+from alist_sync.d_worker import Workers
+from alist_sync.thread_pool import MyThreadPoolExecutor
 from alist_sync.config import SyncGroup, create_config, AlistServer
-from alist_sync.d_checker import Checker
+from alist_sync.d_checker import get_checker
 
 sync_config = create_config()
-
-
-queue_checker = Queue()
-queue_worker = Queue()
 
 
 def login_alist(server: AlistServer):
@@ -40,7 +36,7 @@ def scaner(url: AlistPath, _queue):
     pool.wait()
 
 
-def checker(sync_group: SyncGroup, _queue: Queue):
+def checker(sync_group: SyncGroup, _queue_worker: Queue):
     """"""
     if sync_group.enable is False:
         return
@@ -59,8 +55,15 @@ def checker(sync_group: SyncGroup, _queue: Queue):
         for uri in sync_group.group:
             scaner(uri, _queue_scaner)
 
-    return Checker(sync_group, _queue_scaner, _queue).mian()  # main()是死循环
+    _t_workers = Workers().start(_queue_worker)
+
+    _c = get_checker(sync_group.type)
+    return _c(sync_group, _queue_scaner, _queue_worker).mian()  # main()是死循环
 
 
 def mian():
     """"""
+    _queue_worker = Queue(30)
+
+    for sync_group in sync_config.sync_groups:
+        checker(sync_group, _queue_worker)

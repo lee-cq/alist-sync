@@ -11,22 +11,6 @@ alist_servers:
     username: "admin"
     password: "admin"
 
-notify: # 通知服务，当触发一些异常后，将会发送通知。
-  - enable: false
-    type: email
-    smtp_host: ""
-    smtp_port: 25
-    sender: ""
-    password: ""
-    recipients:
-      - ""
-
-  - enable: false
-    type: webhook
-    webhook_url: ""
-    headers:
-      K: V
-
 
 sync_groups:
   - name: "sync1"
@@ -40,7 +24,36 @@ sync_groups:
     #         删除存在于目录目录但不存在于源目录中的文件
     # 4 sync-incr: 基于文件的修改时间，只同步源目录中修改时间晚于目标目录的文件
     type: "copy"
+
+    # 是否需要备份，如果为True，则会在同步之前备份目标目录
+    # 对于copy，该值无效
+    need_backup: false  # 默认值: False
+
+    # 备份目录，当need_backup为True时，该值有效
+    # 一个相对目录，最终为每一个group中的每一个server创建一个备份目录
+    backup_dir: "./.alist-sync-backup"  # 默认值: ./.alist-sync-backup
+
+    # 同步目录，一个完整的AList URL，
+    # 对于copy, mirror 第一个为源目录，其他个为目标目录
+    # Alist服务器信息需要提前在alist_servers中配置
+    # 支持在不同的Alist服务器之间同步
+    # 例子：http://localhost:5244/test1
     group:
       - "http://localhost:5244/test1"
       - "http://localhost:5245/test2"
 
+notify: # 通知服务，当触发一些异常后，将会发送通知。
+  - enable: true
+    type: email
+    smtp_host: ""
+    smtp_port: 25
+    sender: ""
+    password: ""
+    recipients:
+      - ""
+
+  - enable: true
+    type: webhook
+    webhook_url: ""
+    headers:
+      K: V

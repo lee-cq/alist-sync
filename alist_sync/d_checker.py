@@ -7,8 +7,9 @@
 
 """
 from queue import Queue
-from pymongo.collection import Collection
+from typing import Iterator
 
+from pymongo.collection import Collection
 from alist_sdk import AlistPath
 
 from alist_sync.config import create_config, SyncGroup
@@ -35,7 +36,7 @@ class Checker:
         for sr in self.sync_group.group:
             try:
                 return sr, path.relative_to(sr)
-            except:
+            except ValueError as e:
                 pass
         raise ValueError()
 
@@ -50,15 +51,29 @@ class Checker:
                 if not None:
                     self.locker.add(AlistPath(p))
 
-    def checker(self, path) -> "Worker|None":
-        """检查器"""
-        raise NotImplemented
+    def get_backup_dir(self, path) -> AlistPath:
+        return self.split_path(path)[0].joinpath(self.sync_group.backup_dir)
+
+    def _checker(self, source_path: AlistPath, target_path: AlistPath) -> "Worker|None":
+        raise NotImplementedError
+
+    def checker(self, path) -> Iterator[Worker | None]:
+        # _sg = self.sync_group.group.copy()
+        _sync_dir, _relative_path = self.split_path(path)
+
+        for _sd in self.sync_group.group:
+            _sd: AlistPath
+            if _sd == _sync_dir:
+                continue
+            target_path = _sd.joinpath(_relative_path)
+            yield self._checker(target_path, path)
 
     def _t_checker(self, path):
         if path in self.locker:
             return
-        if _c := self.checker(path):
-            self.worker_queue.put(_c)
+        for _c in self.checker(path):
+            if _c:
+                self.worker_queue.put(_c)
 
     def mian(self):
         """"""
@@ -70,29 +85,63 @@ class Checker:
 class CheckerCopy(Checker):
     """"""
 
-    def checker(self, path) -> "Worker|None":
-        _sg = self.sync_group.group.copy()
-        _sync_dir, _relative_path = self.split_path(path)
-        _sg.remove(_sync_dir)
+    def _checker(
+        self,
+        source_path: AlistPath,
+        target_path: AlistPath,
+    ) -> "Worker|None":
 
-        for _sd in _sg:
-            _sd: AlistPath
-            target_path = _sd.joinpath(_relative_path)
-
-            if not target_path.exists() and target_path not in self.locker:
-                self.locker.add(target_path)
-                self.locker.add(path)
-                return Worker(
-                    type="copy",
-                    need_backup=False,
-                    source_path=path,
-                    target_path=target_path,
-                )
+        if not target_path.exists() and target_path not in self.locker:
+            self.locker.add(target_path)
+            self.locker.add(source_path)
+            return Worker(
+                type="copy",
+                need_backup=False,
+                source_path=source_path,
+                target_path=target_path,
+            )
+        return None
 
 
 class CheckerMirror(Checker):
     """"""
 
+    def _checker(self, source_path: AlistPath, target_path: AlistPath) -> "Worker|None":
+        _main = self.sync_group.group[0]
+        # target如果是主存储器 - 且target不存在，source存在，删除source
+        if target_path == _main and not target_path.exists() and source_path.exists():
+            self.locker.add(target_path)
+            self.locker.add(source_path)
+            return Worker(
+                type="delete",
+                need_backup=self.sync_group.need_backup,
+                backup_dir=self.get_backup_dir(source_path),
+                target_path=source_path,
+            )
+        if not target_path.exists() and target_path not in self.locker:
+            self.locker.add(target_path)
+            self.locker.add(source_path)
+            return Worker(
+                type="copy",
+                need_backup=False,
+                source_path=source_path,
+                target_path=target_path,
+            )
+        return None
+
 
 class CheckerSync(Checker):
     """"""
+
+
+class CheckerSyncIncr(Checker):
+    """"""
+
+
+def get_checker(type_: str) -> type(Checker):
+    return {
+        "copy": CheckerCopy,
+        "mirror": CheckerMirror,
+        "sync": CheckerSync,
+        "sync-incr": CheckerSyncIncr,
+    }[type_]

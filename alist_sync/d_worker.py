@@ -39,8 +39,8 @@ class Worker(BaseModel):
     need_backup: bool
     backup_dir: AlistPathType | None = None
 
-    source_path: AlistPathType
-    target_path: AlistPathType | None = None
+    source_path: AlistPathType | None = None
+    target_path: AlistPathType  # 永远只操作Target文件，删除也是作为Target
     status: WorkerStatus = "init"
     error_info: BaseException | None = None
 
@@ -161,15 +161,6 @@ if __name__ == "__main__":
     uri = os.environ["MONGODB_URI"]
 
     client = MongoClient(uri, server_api=ServerApi("1"))
-    # w = Worker(
-    #     owner="admin",
-    #     type="delete",
-    #     need_backup=True,
-    #     backer_dir=AlistPath("http://localhost:5244/local/.history"),
-    #     source_path="http://localhost:5244/local/test.txt",
-    #     collection=client.get_default_database().get_collection("workers"),
-    # )
-    # print(w.update())
 
     ws = Workers(mongodb=client.get_default_database())
     ws.load_from_mongo()
