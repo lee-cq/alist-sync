@@ -36,7 +36,7 @@ class Checker:
         for sr in self.sync_group.group:
             try:
                 return sr, path.relative_to(sr)
-            except ValueError as e:
+            except ValueError:
                 pass
         raise ValueError()
 
@@ -75,7 +75,7 @@ class Checker:
             if _c:
                 self.worker_queue.put(_c)
 
-    def mian(self):
+    def main(self):
         """"""
         while True:
             path = self.scaner_queue.get()

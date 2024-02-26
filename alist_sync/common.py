@@ -7,7 +7,9 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-from alist_sync.config import cache_dir
+from alist_sync.config import create_config
+
+cache_dir = create_config().cache_dir
 
 logger = logging.getLogger("alist-sync.common")
 

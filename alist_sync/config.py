@@ -6,7 +6,8 @@ from pathlib import Path
 from functools import cached_property, lru_cache
 from typing import Optional, Literal
 
-from alist_sdk import AlistPathType
+from alist_sdk import AlistPathType, AlistPath
+from httpx import URL
 from pydantic import Field, BaseModel
 from pymongo.database import Database
 
@@ -44,8 +45,13 @@ class AlistServer(BaseModel):
     def dump_for_alist_client(self):
         return self.model_dump(exclude={"storage_config"})
 
-    def sump_for_sdk(self):
-        return self.model_dump(exclude={"storage_config", "max_connect"})
+    def dump_for_alist_path(self):
+        _data = self.model_dump(
+            exclude={"storage_config", "max_connect"},
+            by_alias=True,
+        )
+        _data["server"] = _data.pop("base_url")
+        return _data
 
     def storages(self) -> list[dict]:
         """返回给定的 storage_config 中包含的storages"""
@@ -88,6 +94,7 @@ class SyncGroup(BaseModel):
     enable: bool = True
     name: str
     type: str
+    interval: int = 300
     need_backup: bool = False
     backup_dir: str = ".alist-sync-backup"
     group: list[AlistPathType] = Field(min_length=2)
@@ -116,10 +123,16 @@ class WebHookNotify(BaseModel):
 class Config(BaseModel):
     """配置"""
 
+    def __hash__(self):
+        return hash(self._id)
+
     _id: str = "alist-sync-config"
 
     cache__dir: Path = Field(
-        default=os.getenv("ALIST_SYNC_CACHE_DIR") or Path(__file__).parent / ".cache",
+        default=os.getenv(
+            "ALIST_SYNC_CACHE_DIR",
+            Path(__file__).parent / ".alist-sync-cache",
+        ),
         alias="cache_dir",
     )
 
@@ -152,8 +165,12 @@ class Config(BaseModel):
     @lru_cache(10)
     def get_server(self, base_url) -> AlistServer:
         """找到AlistServer"""
+        if isinstance(base_url, AlistPath):
+            base_url = base_url.as_uri()
+        find_server = URL(base_url)
         for server in self.alist_servers:
-            if base_url == server.base_url:
+            server_ = URL(server.base_url)
+            if find_server.host == server_.host and find_server.port == server_.port:
                 return server
         raise ModuleNotFoundError()
 
@@ -161,6 +178,9 @@ class Config(BaseModel):
     def mongodb(self) -> "Database":
         from pymongo import MongoClient
         from pymongo.server_api import ServerApi
+
+        if self.mongodb_uri is None:
+            return None
 
         db = MongoClient(
             self.mongodb_uri, server_api=ServerApi("1")

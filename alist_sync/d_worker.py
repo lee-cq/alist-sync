@@ -63,8 +63,8 @@ class Worker(BaseModel):
         return sync_config.cache_dir.joinpath(f"download_tmp_{sha1(self.source_path)}")
 
     def update(self, *field: Any):
-        if self.status == "done" and self.workers is not None:
-            return self.workers.del_worker(self._id)
+        if self.status == "done" and self.collection is not None:
+            return self.collection.delete_one({"_id": self._id})
         return self.update_mongo(*field)
 
     def update_mongo(self, *field):
@@ -133,6 +133,8 @@ class Workers:
 
     def load_from_mongo(self):
         """从MongoDB加载Worker"""
+        if self.mongodb is None:
+            return
         for i in self.mongodb.workers.find():
             self.add_worker(Worker(**i))
 
@@ -146,8 +148,10 @@ class Workers:
             self.add_worker(queue.get())
 
     def start(self, queue: Queue) -> threading.Thread:
+        self.load_from_mongo()
         _t = threading.Thread(target=self.run, args=(queue,))
         _t.start()
+        logger.info("Worker Thread Start...")
         return _t
 
 
