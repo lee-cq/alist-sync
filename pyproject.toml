@@ -15,6 +15,7 @@ dependencies = [
     "async-lru",
     "pydantic",
     "pyyaml",
+    "pymongo"
 ]
 dynamic = ["version"]
 
