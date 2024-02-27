@@ -1,5 +1,6 @@
 import builtins
 import json
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +11,8 @@ from alist_sdk import AlistPathType, AlistPath
 from httpx import URL
 from pydantic import Field, BaseModel
 from pymongo.database import Database
+
+logger = logging.getLogger("alist-sync.config")
 
 
 def create_config():
@@ -175,16 +178,18 @@ class Config(BaseModel):
         raise ModuleNotFoundError()
 
     @cached_property
-    def mongodb(self) -> "Database":
+    def mongodb(self) -> "Database|None":
         from pymongo import MongoClient
         from pymongo.server_api import ServerApi
 
         if self.mongodb_uri is None:
             return None
 
+        logger.info("Contenting MongoDB ...")
         db = MongoClient(
             self.mongodb_uri, server_api=ServerApi("1")
         ).get_default_database()
+        logger.info(f"Contented MongoDB: {db.client.HOST}/{db.name}")
         if db is None:
             raise ValueError("连接数据库失败")
 

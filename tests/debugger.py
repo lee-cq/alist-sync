@@ -9,8 +9,10 @@ import rich
 from alist_sdk import Client
 
 from alist_sync.alist_client import AlistClient
-from alist_sync.config import cache_dir
+from alist_sync.config import create_config
 from common import create_storage_local, clear_dir
+
+cache_dir = create_config().cache_dir
 
 
 WORKDIR = Path(__file__).parent

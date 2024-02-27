@@ -9,7 +9,7 @@ from typing import Literal, Any
 from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
 from pymongo.database import Database
-from alist_sdk.path_lib import AlistPathType
+from alist_sdk.path_lib import AbsAlistPathType
 
 from alist_sync.config import create_config
 from alist_sync.common import sha1
@@ -37,10 +37,10 @@ class Worker(BaseModel):
     created_at: datetime.datetime = datetime.datetime.now()
     type: WorkerType
     need_backup: bool
-    backup_dir: AlistPathType | None = None
+    backup_dir: AbsAlistPathType | None = None
 
-    source_path: AlistPathType | None = None
-    target_path: AlistPathType  # 永远只操作Target文件，删除也是作为Target
+    source_path: AbsAlistPathType | None = None
+    target_path: AbsAlistPathType  # 永远只操作Target文件，删除也是作为Target
     status: WorkerStatus = "init"
     error_info: BaseException | None = None
 
@@ -50,8 +50,18 @@ class Worker(BaseModel):
 
     model_config = {
         "arbitrary_types_allowed": True,
-        "excludes": {"workers", "collection", "tmp_file"},
+        "excludes": {
+            "workers",
+            "collection",
+        },
     }
+
+    def __init__(self, **data: Any):
+        super().__init__(**data)
+        logger.info(f"Worker Created: {self.__repr__()}")
+
+    def __repr__(self):
+        return f"<Worker {self.type} {self.source_path} {self.target_path}>"
 
     @computed_field(return_type=str)
     @property
@@ -82,9 +92,6 @@ class Worker(BaseModel):
             True if field == () else False,
         )
 
-    def __del__(self):
-        self.tmp_file.unlink(missing_ok=True)
-
     def backup(self):
         """备份"""
         if self.backup_dir is None:
@@ -105,6 +112,7 @@ class Worker(BaseModel):
 
     def run(self):
         """启动Worker"""
+        logger.info(f"worker[{self._id}] 已经安排启动.")
         if self.need_backup:
             self.backup()
 
@@ -142,31 +150,30 @@ class Workers:
         worker.workers = self
         worker.collection = self.mongodb.workers
         self.thread_pool.submit(worker.run)
+        logger.info("Worker added to Pool")
 
     def run(self, queue: Queue):
+        self.load_from_mongo()
         while True:
             self.add_worker(queue.get())
 
     def start(self, queue: Queue) -> threading.Thread:
-        self.load_from_mongo()
         _t = threading.Thread(target=self.run, args=(queue,))
         _t.start()
-        logger.info("Worker Thread Start...")
+        logger.info("Worker Main Thread Start...")
         return _t
 
 
 if __name__ == "__main__":
-    import os
-    from pymongo import MongoClient
-    from pymongo.server_api import ServerApi
+    from alist_sdk import AlistPath
 
-    logging.basicConfig(level=logging.DEBUG)
-
-    uri = os.environ["MONGODB_URI"]
-
-    client = MongoClient(uri, server_api=ServerApi("1"))
-
-    ws = Workers(mongodb=client.get_default_database())
-    ws.load_from_mongo()
-    for w in ws.workers:
-        print(w)
+    _w = Worker(
+        type="copy",
+        need_backup=False,
+        source_path=AlistPath("http://local:/sc"),
+        target_path="http://target_path",
+    )
+    print(_w.tmp_file, type(_w.source_path), _w.target_path)
+    print()
+    print(_w.model_dump())
+    print(_w.model_dump(mode="json"))

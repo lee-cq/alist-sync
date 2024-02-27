@@ -3,6 +3,8 @@
 
 """
 import logging
+import threading
+import time
 from queue import Queue
 
 from alist_sdk import AlistPath, login_server
@@ -27,20 +29,28 @@ def login_alist(server: AlistServer):
 
 
 def scaner(url: AlistPath, _queue):
-    def _scaner(_url: AlistPath):
-        """"""
-        for item in _url.iterdir():
-            if item.is_file():
-                _queue.put(item)
-            elif item.is_dir():
-                pool.submit(_scaner, item)
+    def _scaner(_url: AlistPath, _s_num):
+        """ """
+        _s_num.append(1)
+        logger.debug(f"Scaner: {_url}")
+        try:
+            for item in _url.iterdir():
+                if item.is_file():
+                    logger.debug(f"find file: {item}")
+                    _queue.put(item)
+                elif item.is_dir():
+                    pool.submit(_scaner, item, _s_num)
+        finally:
+            _s_num.pop()
 
+    s_sum = []
     pool = MyThreadPoolExecutor(5)
-    pool.submit(_scaner, url)
-    pool.wait()
+    pool.submit(_scaner, url, s_sum)
+    while s_sum:
+        time.sleep(2)
 
 
-def checker(sync_group: SyncGroup, _queue_worker: Queue):
+def checker(sync_group: SyncGroup, _queue_worker: Queue) -> threading.Thread | None:
     """"""
     if sync_group.enable is False:
         logger.warning("Checker: %s is disable", sync_group.name)
@@ -54,18 +64,16 @@ def checker(sync_group: SyncGroup, _queue_worker: Queue):
     _queue_scaner = Queue(30)
     _scaner_pool = MyThreadPoolExecutor(5, "scaner_")
 
-    _sign = ["copy", "mirror"]
+    _ct = get_checker(sync_group.type)(sync_group, _queue_scaner, _queue_worker).start()
 
+    _sign = ["copy"]
     if sync_group.type in _sign:
         scaner(sync_group.group[0], _queue_scaner)
     else:
         for uri in sync_group.group:
             scaner(uri, _queue_scaner)
 
-    _t_workers = Workers().start(_queue_worker)
-
-    _c = get_checker(sync_group.type)
-    return _c(sync_group, _queue_scaner, _queue_worker).main()  # main()是死循环
+    return _ct
 
 
 def main():

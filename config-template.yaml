@@ -1,5 +1,5 @@
 mongodb_uri: "mongodb+srv://${username}:${password}@${host}/alist_sync?retryWrites=true&w=majority&appName=A1"
-cache_dir: ./.cache
+cache_dir: ./.alist-sync-cache
 daemon: false
 
 alist_servers:
@@ -40,7 +40,7 @@ sync_groups:
     # 例子：http://localhost:5244/test1
     group:
       - "http://localhost:5244/test1"
-      - "http://localhost:5245/test2"
+      - "http://localhost:5244/test2"
 
 notify: # 通知服务，当触发一些异常后，将会发送通知。
   - enable: true
