@@ -25,6 +25,9 @@ sync_groups:
     # 4 sync-incr: 基于文件的修改时间，只同步源目录中修改时间晚于目标目录的文件
     type: "copy"
 
+    # 检查间隔，单位为秒，如果daemon为False，则该值无效
+    interval: 300  # 默认值: 300 秒, 5 分钟
+
     # 是否需要备份，如果为True，则会在同步之前备份目标目录
     # 对于copy，该值无效
     need_backup: false  # 默认值: False

@@ -11,7 +11,6 @@ import threading
 from queue import Queue
 from typing import Iterator
 
-from pymongo.collection import Collection
 from alist_sdk import AlistPath
 
 from alist_sync.config import create_config, SyncGroup
@@ -28,9 +27,6 @@ class Checker:
         self.worker_queue = worker_queue
         self.scaner_queue: Queue[AlistPath] = scaner_queue
 
-        self.locker: set = set()
-        self.load_locker()
-
         self.conflict: set = set()
         self.pool = MyThreadPoolExecutor(10)
         self.main_thread = threading.Thread(
@@ -46,17 +42,6 @@ class Checker:
             except ValueError:
                 pass
         raise ValueError()
-
-    def release_lock(self, *items: AlistPath):
-        for p in items:
-            self.locker.remove(p)
-
-    def load_locker(self):
-        col: Collection = sync_config.mongodb.workers
-        for doc in col.find({}, {"source_path": True, "target_path": True}):
-            for p in doc.values():
-                if not None:
-                    self.locker.add(AlistPath(p))
 
     def get_backup_dir(self, path) -> AlistPath:
         return self.split_path(path)[0].joinpath(self.sync_group.backup_dir)
@@ -75,8 +60,6 @@ class Checker:
             yield self.checker(path, target_path)
 
     def _t_checker(self, path):
-        if path in self.locker:
-            return
         for _c in self.checker_every_dir(path):
             if _c:
                 self.worker_queue.put(_c)
@@ -101,9 +84,7 @@ class CheckerCopy(Checker):
         source_path: AlistPath,
         target_path: AlistPath,
     ) -> "Worker|None":
-        if not target_path.exists() and target_path not in self.locker:
-            self.locker.add(target_path)
-            self.locker.add(source_path)
+        if not target_path.exists():
             return Worker(
                 type="copy",
                 need_backup=False,
@@ -120,17 +101,13 @@ class CheckerMirror(Checker):
         _main = self.sync_group.group[0]
         # target如果是主存储器 - 且target不存在，source存在，删除source
         if target_path == _main and not target_path.exists() and source_path.exists():
-            self.locker.add(target_path)
-            self.locker.add(source_path)
             return Worker(
                 type="delete",
                 need_backup=self.sync_group.need_backup,
                 backup_dir=self.get_backup_dir(source_path),
                 target_path=source_path,
             )
-        if not target_path.exists() and target_path not in self.locker:
-            self.locker.add(target_path)
-            self.locker.add(source_path)
+        if not target_path.exists():
             return Worker(
                 type="copy",
                 need_backup=False,

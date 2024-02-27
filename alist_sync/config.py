@@ -5,12 +5,15 @@ import os
 from datetime import datetime
 from pathlib import Path
 from functools import cached_property, lru_cache
-from typing import Optional, Literal
+from typing import Optional, Literal, TYPE_CHECKING
 
 from alist_sdk import AlistPathType, AlistPath
 from httpx import URL
 from pydantic import Field, BaseModel
 from pymongo.database import Database
+
+if TYPE_CHECKING:
+    from alist_sync.data_handle import ShelveHandle, MongoHandle
 
 logger = logging.getLogger("alist-sync.config")
 
@@ -195,16 +198,27 @@ class Config(BaseModel):
 
         return db
 
+    @cached_property
+    def handle(self) -> "ShelveHandle|MongoHandle":
+        from alist_sync.data_handle import ShelveHandle, MongoHandle
+
+        if self.mongodb is None:
+            return ShelveHandle(self.cache_dir)
+        return MongoHandle(self.mongodb)
+
     @classmethod
     def load_from_yaml(cls, file: Path) -> "Config":
         from yaml import safe_load
 
         return cls.model_validate(safe_load(file.open("rb")))
 
-    def dump_to_yaml(self, file: Path):
+    def dump_to_yaml(self, file: Path = None):
         from yaml import safe_dump
 
-        return safe_dump(self.model_dump(mode="json"), file.open("wb"))
+        return safe_dump(
+            self.model_dump(mode="json"),
+            file.open("wb") if file else None,
+        )
 
     def load_from_mongo(self, uri: str = None):
         from pymongo import MongoClient

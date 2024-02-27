@@ -8,8 +8,7 @@ from typing import Literal, Any
 
 from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
-from pymongo.database import Database
-from alist_sdk.path_lib import AbsAlistPathType
+from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 
 from alist_sync.config import create_config
 from alist_sync.common import sha1
@@ -27,6 +26,7 @@ WorkerStatus = Literal[
     "uploading",
     "copied",
     "done",
+    "failed",
 ]
 
 logger = logging.getLogger("alist-sync.worker")
@@ -58,14 +58,14 @@ class Worker(BaseModel):
 
     def __init__(self, **data: Any):
         super().__init__(**data)
-        logger.info(f"Worker Created: {self.__repr__()}")
+        logger.info(f"Worker[{self.id}] Created: {self.__repr__()}")
 
     def __repr__(self):
-        return f"<Worker {self.type} {self.source_path} {self.target_path}>"
+        return f"<Worker {self.type}: {self.source_path} -> {self.target_path}>"
 
-    @computed_field(return_type=str)
+    @computed_field(return_type=str, alias="_id")
     @property
-    def _id(self) -> str:
+    def id(self) -> str:
         return sha1(f"{self.type}{self.source_path}{self.created_at}")
 
     @property
@@ -75,28 +75,13 @@ class Worker(BaseModel):
     def update(self, *field: Any):
         if self.status == "done" and self.collection is not None:
             return self.collection.delete_one({"_id": self._id})
-        return self.update_mongo(*field)
-
-    def update_mongo(self, *field):
-        """"""
-
-        if field == ():
-            data = self.model_dump(mode="json")
-        else:
-            data = {k: self.__getattr__(k) for k in field}
-
-        logger.debug("更新Worker: %s", data)
-        return self.collection.update_one(
-            {"_id": self._id},
-            {"$set": data},
-            True if field == () else False,
-        )
+        return sync_config.handle.update_worker(self, *field)
 
     def backup(self):
         """备份"""
         if self.backup_dir is None:
             raise ValueError("Need Backup, But no Dir.")
-        backup_file = self.source_path if self.type == "delete" else self.target_path
+        _backup_file = self.source_path if self.type == "delete" else self.target_path
 
     def downloader(self):
         """HTTP多线程下载"""
@@ -113,24 +98,30 @@ class Worker(BaseModel):
     def run(self):
         """启动Worker"""
         logger.info(f"worker[{self._id}] 已经安排启动.")
-        if self.need_backup:
-            self.backup()
+        try:
+            if self.need_backup:
+                self.backup()
 
-        if self.type == "copy":
-            self.copy_type()
-        elif self.type == "delete":
-            self.delete_type()
+            if self.type == "copy":
+                self.copy_type()
+            elif self.type == "delete":
+                self.delete_type()
+        except Exception as _e:
+            self.error_info = _e
+            self.status = "failed"
+            self.update()
+            logger.error(f"worker[{self._id}] 出现错误: {_e}")
 
 
 class Workers:
-    # workers: list[Worker] = []
 
-    def __init__(self, mongodb: Database = None):
-        self.mongodb: Database = mongodb or sync_config.mongodb
+    def __init__(self):
         self.thread_pool = MyThreadPoolExecutor(
             5,
             "worker_",
         )
+
+        self.lockers: set[AlistPath] = set()
 
         atexit.register(self.__del__)
 
@@ -139,21 +130,28 @@ class Workers:
             if i.name.startswith("download_tmp_"):
                 i.unlink(missing_ok=True)
 
-    def load_from_mongo(self):
-        """从MongoDB加载Worker"""
-        if self.mongodb is None:
-            return
-        for i in self.mongodb.workers.find():
-            self.add_worker(Worker(**i))
+    def release_lock(self, *items: AlistPath):
+        for p in items:
+            self.lockers.remove(p)
 
     def add_worker(self, worker: Worker):
+        if worker.source_path in self.lockers or worker.target_path in self.lockers:
+            logger.warning(f"Worker {worker} 有路径被锁定.")
+            return
+
+        self.lockers.add(worker.source_path)
+        self.lockers.add(worker.target_path)
+
         worker.workers = self
-        worker.collection = self.mongodb.workers
         self.thread_pool.submit(worker.run)
-        logger.info("Worker added to Pool")
+        logger.info(f"Worker[{worker.id}] added to ThreadPool.")
 
     def run(self, queue: Queue):
-        self.load_from_mongo()
+        """"""
+        self.lockers |= sync_config.handle.load_locker()
+        for i in sync_config.handle.get_workers():
+            self.add_worker(Worker(**i))
+
         while True:
             self.add_worker(queue.get())
 

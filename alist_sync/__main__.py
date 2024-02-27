@@ -39,7 +39,10 @@ _verify: bool = Option(
 )
 
 _backup: bool = Option(
-    False, "--backup", "-b", help="删除或覆盖目标文件时备份文件到.alist-sync-data/history"
+    False,
+    "--backup",
+    "-b",
+    help="删除或覆盖目标文件时备份文件到.alist-sync-data/history",
 )
 
 _stores_config: str | None = Option(
@@ -193,6 +196,14 @@ def sync_incr(
     )
     echo(f"增量同步：{sync_group}")
     return SyncIncr(alist_info, config_dir, cache_dir, sync_group).run()
+
+
+@app.command("test-config")
+def t_config():
+    """测试配置"""
+    from alist_sync.config import create_config
+
+    echo(create_config().dump_to_yaml())
 
 
 if __name__ == "__main__":
