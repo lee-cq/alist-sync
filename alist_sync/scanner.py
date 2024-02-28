@@ -20,6 +20,8 @@ class Scanner(BaseModel):
     queue: asyncio.Queue = asyncio.Queue(30)
     items: dict[str | PurePosixPath, list[Item]]
 
+    model_config = {"arbitrary_types_allowed": True}
+
     @classmethod
     async def scans(cls, *scan_path, client: AlistClient = None):
         """扫描目录"""

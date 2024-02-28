@@ -8,7 +8,6 @@ import time
 from queue import Queue
 
 from alist_sdk import AlistPath, login_server
-from alist_sdk.path_lib import ALIST_SERVER_INFO
 
 from alist_sync.d_worker import Workers
 from alist_sync.thread_pool import MyThreadPoolExecutor
@@ -21,11 +20,8 @@ logger = logging.getLogger("alist-sync.main")
 
 def login_alist(server: AlistServer):
     """"""
-    if server.base_url in ALIST_SERVER_INFO:
-        return
-    login_server(**server.dump_for_alist_path())
-    server.token = ALIST_SERVER_INFO.get(server.base_url)
-    logger.info("Login: %s Success.", server.base_url)
+    _c = login_server(**server.dump_for_alist_path())
+    logger.info("Login: %s[%s] Success.", _c.base_url, _c.login_username)
 
 
 def scaner(url: AlistPath, _queue):
@@ -42,6 +38,8 @@ def scaner(url: AlistPath, _queue):
                     pool.submit(_scaner, item, _s_num)
         finally:
             _s_num.pop()
+
+    assert url.exists(), f"目录不存在{url.as_uri()}"
 
     s_sum = []
     pool = MyThreadPoolExecutor(5)
@@ -68,6 +66,7 @@ def checker(sync_group: SyncGroup, _queue_worker: Queue) -> threading.Thread | N
 
     _sign = ["copy"]
     if sync_group.type in _sign:
+        logger.debug(f"Copy 只需要扫描 {sync_group.group[0].as_uri() = }")
         scaner(sync_group.group[0], _queue_scaner)
     else:
         for uri in sync_group.group:
@@ -89,7 +88,7 @@ def main():
 
 if __name__ == "__main__":
     logger_alist_sync = logging.getLogger("alist-sync")
-    logger_alist_sync.setLevel(logging.DEBUG)
+    logger_alist_sync.setLevel(logging.INFO)
     logger_alist_sync.addHandler(logging.StreamHandler())
     logger.info("Begin...")
     main()

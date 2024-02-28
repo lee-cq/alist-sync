@@ -4,9 +4,9 @@ import logging
 import threading
 from pathlib import Path
 from queue import Queue
-from typing import Literal, Any
+from typing import Literal, Any, Annotated
 
-from pydantic import BaseModel, computed_field, Field
+from pydantic import BaseModel, computed_field, Field, PlainSerializer
 from pymongo.collection import Collection
 from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 
@@ -32,9 +32,11 @@ WorkerStatus = Literal[
 logger = logging.getLogger("alist-sync.worker")
 
 
+# noinspection PyTypeHints
 class Worker(BaseModel):
     owner: str = sync_config.runner_name
     created_at: datetime.datetime = datetime.datetime.now()
+    done_at: datetime.datetime | None = None
     type: WorkerType
     need_backup: bool
     backup_dir: AbsAlistPathType | None = None
@@ -42,7 +44,7 @@ class Worker(BaseModel):
     source_path: AbsAlistPathType | None = None
     target_path: AbsAlistPathType  # 永远只操作Target文件，删除也是作为Target
     status: WorkerStatus = "init"
-    error_info: BaseException | None = None
+    error_info: str | None = None
 
     # 私有属性
     workers: "Workers | None" = Field(None, exclude=True)
@@ -72,49 +74,114 @@ class Worker(BaseModel):
     def tmp_file(self) -> Path:
         return sync_config.cache_dir.joinpath(f"download_tmp_{sha1(self.source_path)}")
 
-    def update(self, *field: Any):
-        if self.status == "done" and self.collection is not None:
-            return self.collection.delete_one({"_id": self._id})
-        return sync_config.handle.update_worker(self, *field)
+    def update(self, **field: Any):
+        if field:
+            if field.keys() | self.__dict__.keys() != self.__dict__.keys():
+                raise KeyError()
+            self.__dict__.update(field)
+
+        if self.status in ["done", "failed"]:
+            logger.info(f"Worker[{self.id}] is {self.status}.")
+            self.done_at = datetime.datetime.now()
+            sync_config.handle.create_log(self)
+            return sync_config.handle.delete_worker(self.id)
+        return sync_config.handle.update_worker(self, *field.keys())
 
     def backup(self):
         """备份"""
         if self.backup_dir is None:
             raise ValueError("Need Backup, But no Dir.")
-        _backup_file = self.source_path if self.type == "delete" else self.target_path
+        _backup_file = self.target_path
+        _target_name = (
+            f"{sha1(_backup_file.as_posix())}_"
+            f"{int(_backup_file.stat().modified.timestamp())}.history"
+        )
+        _backup_target = self.backup_dir.joinpath(_target_name)
+        _backup_target_json = self.backup_dir.joinpath(_target_name + ".json")
+        _old_info = _backup_file.stat().model_dump_json()
+
+        self.update(status="back-upping")
+
+        assert (
+            not _backup_target.exists() and not _backup_target_json.exists()
+        ), "备份目标冲突"
+
+        _backup_file.rename(_backup_target)
+        assert _backup_target.exists()
+        _backup_target_json.write_text(_old_info)
+        assert _backup_target_json.re_stat() is not None
+
+        self.update(status="back-upped")
+        logger.info(f"Worker[{self.id}] Backup Success.")
 
     def downloader(self):
         """HTTP多线程下载"""
 
     def upload(self):
         """上传到alist"""
+        if self.source_path.stat().size != self.tmp_file.stat().st_size:
+            raise
+        self.update(status="uploading")
+        return self.target_path.write_bytes(self.tmp_file)
 
     def copy_type(self):
         """复制任务"""
+        logger.debug(f"Worker[{self.id}] Start Copping")
+
+        if self.source_path.stat().size < 10 * 1024 * 1024:
+            self.target_path.unlink(missing_ok=True)
+            self.target_path.parent.mkdir(parents=True, exist_ok=True)
+            _res = self.target_path.write_bytes(self.source_path.read_bytes())
+            assert _res.size == self.source_path.stat().size
+
+            return self.update(status="copied")
+
+        logger.error(
+            f"Worker[{self.id}]大于10M的文件尚未实现。file: {self.source_path.as_uri()} "
+            f"size:{self.source_path.stat().size}"
+        )
+        raise NotImplementedError(
+            f"大于10M的文件尚未实现。file: {self.source_path.as_uri()}:{self.source_path.stat().size}"
+        )
 
     def delete_type(self):
         """删除任务"""
+        self.target_path.unlink(missing_ok=True)
+        assert not self.target_path.exists()
+        self.update(status="deleted")
+
+    def recheck(self):
+        """再次检查当前Worker的结果是否符合预期。"""
+        return True
 
     def run(self):
         """启动Worker"""
-        logger.info(f"worker[{self._id}] 已经安排启动.")
+        logger.info(f"worker[{self.id}] 已经安排启动.")
+        self.update()
+        logger.debug(f"Worker[{self.id}] Updated to DB.")
         try:
-            if self.need_backup:
+            if self.status in ["done", "failed"]:
+                return
+            if self.need_backup and self.status in [
+                "init",
+            ]:
                 self.backup()
 
-            if self.type == "copy":
+            if self.type == "copy" and self.status in ["init", "back-upped"]:
                 self.copy_type()
-            elif self.type == "delete":
+
+            elif self.type == "delete" and self.status in ["init", "back-upped"]:
                 self.delete_type()
+
+            assert self.recheck()
+            self.update(status="done")
         except Exception as _e:
-            self.error_info = _e
-            self.status = "failed"
-            self.update()
-            logger.error(f"worker[{self._id}] 出现错误: {_e}")
+            self.error_info = str(_e)
+            self.update(status="failed")
+            logger.error(f"worker[{self.id}] 出现错误: {_e}")
 
 
 class Workers:
-
     def __init__(self):
         self.thread_pool = MyThreadPoolExecutor(
             5,
@@ -134,23 +201,25 @@ class Workers:
         for p in items:
             self.lockers.remove(p)
 
-    def add_worker(self, worker: Worker):
-        if worker.source_path in self.lockers or worker.target_path in self.lockers:
-            logger.warning(f"Worker {worker} 有路径被锁定.")
+    def add_worker(self, worker: Worker, is_loader=False):
+        if not is_loader and (
+            worker.source_path in self.lockers or worker.target_path in self.lockers
+        ):
+            logger.warning(f"Worker[{worker.id}]中有路径被锁定.")
             return
 
         self.lockers.add(worker.source_path)
         self.lockers.add(worker.target_path)
 
         worker.workers = self
-        self.thread_pool.submit(worker.run)
+        self.thread_pool.submit_wait(worker.run)
         logger.info(f"Worker[{worker.id}] added to ThreadPool.")
 
     def run(self, queue: Queue):
         """"""
         self.lockers |= sync_config.handle.load_locker()
         for i in sync_config.handle.get_workers():
-            self.add_worker(Worker(**i))
+            self.add_worker(Worker(**i), is_loader=True)
 
         while True:
             self.add_worker(queue.get())

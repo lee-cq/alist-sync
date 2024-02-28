@@ -24,7 +24,6 @@ logger = logging.getLogger("alist-sync.data_handle")
 
 
 class HandleBase(metaclass=abc.ABCMeta):
-
     @abc.abstractmethod
     def update_worker(self, worker: "Worker", *field):
         """更新或创建Worker"""
@@ -69,20 +68,28 @@ class HandleBase(metaclass=abc.ABCMeta):
         """获取FileItem"""
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def create_log(self, worker: "Worker"):
+        """"""
+
 
 class MongoHandle(HandleBase):
-
     def __init__(self, mongodb: "Database"):
         self._workers: "Collection" = mongodb.workers
         self._items: "Collection" = mongodb.items
+        self._logs: "Collection" = mongodb.create_collection()
+
+    def create_log(self, worker: "Worker"):
+        logger.info(f"create log {worker.id} {worker.status}")
+        self._logs.insert_one(worker.model_dump(mode="json"))
 
     def update_worker(self, worker: "Worker", *field):
         if field == ():
             data = worker.model_dump(mode="json")
         else:
-            data = {k: worker.__getattr__(k) for k in field}
+            data = {k: worker.__dict__.get(k) for k in field}
 
-        logger.debug("更新Worker: %s", data)
+        logger.debug(f"更新Worker[{worker.id}]: {data}")
         return self._workers.update_one(
             {"_id": worker.id},
             {"$set": data},
@@ -145,7 +152,6 @@ class MongoHandle(HandleBase):
 
 
 class ShelveHandle(HandleBase):
-
     def __init__(self, save_dir: Path):
         self._workers = shelve.open(
             str(save_dir.joinpath("alist_cache_workers.shelve")), writeback=True
@@ -153,11 +159,22 @@ class ShelveHandle(HandleBase):
         self._items = shelve.open(
             str(save_dir.joinpath("alist_cache_items.shelve")), writeback=True
         )
+        self._logs = open(str(save_dir.joinpath("alist-sync-files.log", "a+")))
+
+    def __del__(self):
+        self._workers.close()
+        self._items.close()
+        self._logs.close()
+
+    def create_log(self, worker: "Worker"):
+        logger.info(f"create log for: {worker.id}")
+        self._logs.write(worker.model_dump_json())
 
     def update_worker(self, worker: "Worker", *field):
         self._workers[worker.id] = worker
 
     def delete_worker(self, worker_id: str):
+        logger.info(f"Worker[{worker_id}] remove from workers")
         self._workers.pop(worker_id)
 
     def get_worker(self, worker_id: str):
