@@ -121,12 +121,34 @@ class Worker(BaseModel):
     def downloader(self):
         """HTTP多线程下载"""
 
-    def upload(self):
-        """上传到alist"""
-        if self.source_path.stat().size != self.tmp_file.stat().st_size:
-            raise
-        self.update(status="uploading")
-        return self.target_path.write_bytes(self.tmp_file)
+    def copy_single_stream(self):
+        import urllib.parse
+
+        # download
+        _tmp = self.tmp_file.open("wb")
+        with self.source_path.client.stream(
+            self.source_path.get_download_uri()
+        ) as _res:
+            for i in _res.iter_by(chunk_size=1024 * 1024):
+                _tmp.write(i)
+        _tmp.seek(0)
+        self.update(status="downloaded")
+        # upload
+        self.target_path.client.verify_request(
+            "PUT",
+            "/api/fs/put",
+            headers={
+                "As-Task": "false",
+                "Content-Type": "application/octet-stream",
+                "Last-Modified": str(
+                    int(self.source_path.stat().modified.timestamp() * 1000)
+                ),
+                "File-Path": urllib.parse.quote_plus(str(self.target_path.as_posix())),
+            },
+            content=_tmp,
+        )
+
+        self.update(status="uploaded")
 
     def copy_type(self):
         """复制任务"""
@@ -136,17 +158,12 @@ class Worker(BaseModel):
             self.target_path.unlink(missing_ok=True)
             self.target_path.parent.mkdir(parents=True, exist_ok=True)
             _res = self.target_path.write_bytes(self.source_path.read_bytes())
-            assert _res.size == self.source_path.stat().size
 
-            return self.update(status="copied")
+        else:
+            self.copy_single_stream()
 
-        logger.error(
-            f"Worker[{self.id}]大于10M的文件尚未实现。file: {self.source_path.as_uri()} "
-            f"size:{self.source_path.stat().size}"
-        )
-        raise NotImplementedError(
-            f"大于10M的文件尚未实现。file: {self.source_path.as_uri()}:{self.source_path.stat().size}"
-        )
+        assert self.target_path.re_stat().size == self.source_path.stat().size
+        return self.update(status="copied")
 
     def delete_type(self):
         """删除任务"""

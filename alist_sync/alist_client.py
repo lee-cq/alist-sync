@@ -119,7 +119,7 @@ def create_async_client(client: Client) -> AlistClient:
     _server = sync_config.get_server(client.base_url)
     _server.token = client.headers.get("authorization")
 
-    _ac = AlistClient(**_server)
+    _ac = AlistClient(**_server.dump_for_alist_client())
     _ac.headers = client.headers
     _ac.cookies = client.cookies
     return _ac
