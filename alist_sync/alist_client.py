@@ -13,7 +13,7 @@ from alist_sync.config import create_config
 logger = logging.getLogger("alist-sync.client")
 sync_config = create_config()
 
-__all__ = ["AlistClient", "get_status"]
+__all__ = ["AlistClient", "get_status", "create_async_client"]
 
 CopyStatusModify = Literal[
     "init",

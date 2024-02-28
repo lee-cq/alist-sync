@@ -4,9 +4,9 @@ import logging
 import threading
 from pathlib import Path
 from queue import Queue
-from typing import Literal, Any, Annotated
+from typing import Literal, Any
 
-from pydantic import BaseModel, computed_field, Field, PlainSerializer
+from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
 from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 
@@ -69,6 +69,10 @@ class Worker(BaseModel):
     @property
     def id(self) -> str:
         return sha1(f"{self.type}{self.source_path}{self.created_at}")
+
+    @property
+    def short_id(self) -> str:
+        return self.id[:8]
 
     @property
     def tmp_file(self) -> Path:

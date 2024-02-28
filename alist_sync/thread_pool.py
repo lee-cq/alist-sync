@@ -1,6 +1,5 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
-from copy import copy
 
 
 class MyThreadPoolExecutor(ThreadPoolExecutor):

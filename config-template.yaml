@@ -7,12 +7,18 @@ cache_dir: ./.alist-sync-cache
 # 是否以Daemon模式运行
 daemon: false
 
+thread_pool_max_size:
+  workers: 5
+  scanner: 5
+  checker: 5
+
 # Alist 服务器信息 type: list
 alist_servers:
   - base_url: http://localhost:5244/
     username: "admin"
     password: "123456"
     verify_ssl: false
+
   - base_url: http://remote_alist_server/
     username: "admin"
     password: "admin"
