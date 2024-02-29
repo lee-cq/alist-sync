@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from functools import cached_property, lru_cache
-from typing import Optional, Literal, TYPE_CHECKING
+from typing import Optional, Literal, TYPE_CHECKING, Any
 
 from alist_sdk import AlistPathType, AlistPath
 from httpx import URL
@@ -28,8 +28,8 @@ def create_config():
         "ALIST_SYNC_CONFIG", Path(__file__).parent.parent / "config.yaml"
     )
 
-    sync_config = Config.load_from_yaml(config_file)
-    setattr(builtins, "sync_config", sync_config)
+    _sync_config = Config.load_from_yaml(config_file)
+    setattr(builtins, "sync_config", _sync_config)
     return sync_config
 
 
@@ -165,6 +165,16 @@ class Config(BaseModel):
     sync_groups: list[SyncGroup] = []
 
     create_time: datetime = datetime.now()
+    logs: dict = None
+
+    def __init__(self, **data: Any):
+        super().__init__(**data)
+        import logging.config
+
+        _ = self.start_time
+        if self.logs:
+            Path("logs").mkdir(exist_ok=True, parents=True)
+            logging.config.dictConfig(self.logs)
 
     @cached_property
     def start_time(self) -> int:
@@ -225,6 +235,8 @@ class Config(BaseModel):
         return safe_dump(
             self.model_dump(mode="json"),
             file.open("wb") if file else None,
+            sort_keys=False,
+            allow_unicode=True,
         )
 
     def load_from_mongo(self, uri: str = None):
@@ -240,6 +252,9 @@ class Config(BaseModel):
             {"$set": self.model_dump(mode="json")},
             True,
         )
+
+
+sync_config = create_config()
 
 
 if __name__ == "__main__":

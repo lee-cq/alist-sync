@@ -17,7 +17,7 @@ from alist_sdk import AlistPath
 from alist_sync.config import create_config, SyncGroup
 from alist_sync.d_worker import Worker
 from alist_sync.thread_pool import MyThreadPoolExecutor
-from common import prefix_in_threads
+from alist_sync.common import prefix_in_threads
 
 logger = logging.getLogger("alist-sync.d_checker")
 sync_config = create_config()
@@ -58,7 +58,6 @@ class Checker:
             if _sd == _sync_dir:
                 continue
             target_path = _sd.joinpath(_relative_path)
-            logger.debug(f"Check: {target_path} -> {path}")
             yield self.checker(path, target_path)
 
     def _t_checker(self, path):
@@ -69,6 +68,7 @@ class Checker:
     def main(self):
         """"""
         logger.info(f"Checker Started - name: {self.main_thread.name}")
+        _started = False
         while True:
             if (
                 self.scaner_queue.empty()
@@ -80,10 +80,16 @@ class Checker:
                 break
 
             try:
+                _started = True
                 self._t_checker(self.scaner_queue.get(timeout=3))
             except Empty:
-                logger.debug("Checkers: 空 Scaner 队列.")
-                pass
+                if _started:
+                    continue
+                logger.info(
+                    f"Checkers: 空 Scaner 队列, 如果没有新的任务, "
+                    f"{sync_config.timeout - (time.time() - sync_config.start_time):d}"
+                    f"秒后退出"
+                )
 
     def start(self) -> threading.Thread:
         self.main_thread.start()

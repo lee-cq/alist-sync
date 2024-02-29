@@ -4,7 +4,7 @@ from alist_sync.base_sync import SyncBase
 from alist_sync.checker import check_dir
 from alist_sync.common import async_all_task_names
 from alist_sync.job_copy import CopyJob
-from alist_sync.models import AlistServer
+from alist_sync.config import AlistServer
 
 logger = logging.getLogger("alist-sync.copy-to-target")
 

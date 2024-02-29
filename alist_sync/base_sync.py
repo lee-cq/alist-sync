@@ -6,7 +6,7 @@ from alist_sdk import Client
 
 from alist_sync.alist_client import AlistClient
 from alist_sync.common import timeout_input
-from alist_sync.models import AlistServer
+from alist_sync.config import AlistServer
 
 logger = logging.getLogger("alist-sync.base")
 

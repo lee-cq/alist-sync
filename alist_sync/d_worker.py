@@ -61,7 +61,7 @@ class Worker(BaseModel):
 
     def __init__(self, **data: Any):
         super().__init__(**data)
-        logger.info(f"Worker[{self.id}] Created: {self.__repr__()}")
+        logger.info(f"Worker[{self.short_id}] Created: {self.__repr__()}")
 
     def __repr__(self):
         return f"<Worker {self.type}: {self.source_path} -> {self.target_path}>"
@@ -86,10 +86,11 @@ class Worker(BaseModel):
             self.__dict__.update(field)
 
         if self.status in ["done", "failed"]:
-            logger.info(f"Worker[{self.id}] is {self.status}.")
+            logger.info(f"Worker[{self.short_id}] is {self.status}.")
             self.done_at = datetime.datetime.now()
             sync_config.handle.create_log(self)
             return sync_config.handle.delete_worker(self.id)
+
         return sync_config.handle.update_worker(self, *field.keys())
 
     def backup(self):
@@ -117,7 +118,7 @@ class Worker(BaseModel):
         assert _backup_target_json.re_stat() is not None
 
         self.update(status="back-upped")
-        logger.info(f"Worker[{self.id}] Backup Success.")
+        logger.info(f"Worker[{self.short_id}] Backup Success.")
 
     def downloader(self):
         """HTTP多线程下载"""
@@ -155,19 +156,20 @@ class Worker(BaseModel):
             )
 
         assert res.code == 200
+        logger.info(f"Worker[{self.short_id}] Upload File [{res.code}] {res.message}.")
         self.update(status="uploaded")
 
     def copy_type(self):
         """复制任务"""
-        logger.debug(f"Worker[{self.id}] Start Copping")
+        logger.debug(f"Worker[{self.short_id}] Start Copping")
 
-        if self.source_path.stat().size < 10 * 1024 * 1024:
-            self.target_path.unlink(missing_ok=True)
-            self.target_path.parent.mkdir(parents=True, exist_ok=True)
-            _res = self.target_path.write_bytes(self.source_path.read_bytes())
-
-        else:
-            self.copy_single_stream()
+        # if self.source_path.stat().size < 10 * 1024 * 1024:
+        #     self.target_path.unlink(missing_ok=True)
+        #     self.target_path.parent.mkdir(parents=True, exist_ok=True)
+        #     _res = self.target_path.write_bytes(self.source_path.read_bytes())
+        #
+        # else:
+        self.copy_single_stream()
 
         assert self.target_path.re_stat().size == self.source_path.stat().size
         return self.update(status="copied")
@@ -184,9 +186,9 @@ class Worker(BaseModel):
 
     def run(self):
         """启动Worker"""
-        logger.info(f"worker[{self.id}] 已经安排启动.")
+        logger.info(f"worker[{self.short_id}] 已经开始工作.")
         self.update()
-        logger.debug(f"Worker[{self.id}] Updated to DB.")
+        logger.debug(f"Worker[{self.short_id}] Updated to DB.")
         try:
             if self.status in ["done", "failed"]:
                 return
@@ -202,11 +204,11 @@ class Worker(BaseModel):
                 self.delete_type()
 
             assert self.recheck()
-            self.update(status="done")
+            self.update(status=f"Worker[{self.short_id}] Done.")
         except Exception as _e:
+            logger.error(f"worker[{self.short_id}] 出现错误: {_e}")
             self.error_info = str(_e)
             self.update(status="failed")
-            logger.error(f"worker[{self.id}] 出现错误: {_e}")
 
 
 class Workers:
@@ -248,6 +250,7 @@ class Workers:
         # self.lockers |= sync_config.handle.load_locker()
         # for i in sync_config.handle.get_workers():
         #     self.add_worker(Worker(**i), is_loader=True)
+        _started = False
         while True:
             if (
                 queue.empty()
@@ -255,16 +258,24 @@ class Workers:
                 and not prefix_in_threads("checker_")
                 and time.time() - sync_config.start_time > sync_config.timeout
             ):
-                logger.info(f"等待Worker执行完成, 排队中的数量: {self.thread_pool.work_qsize()}")
-                self.thread_pool.shutdown(wait=True)
+                logger.info(
+                    f"等待Worker执行完成, 排队中的数量: {self.thread_pool.work_qsize()}"
+                )
+                self.thread_pool.shutdown(wait=True, cancel_futures=False)
                 logger.info(f"循环线程退出 - {threading.current_thread().name}")
                 break
 
             try:
+                _started = True
                 self.add_worker(queue.get(timeout=3))
             except Empty:
-                logger.debug("Workers: 空Worker Queue.")
-                pass
+                if _started:
+                    continue
+                logger.info(
+                    f"Checkers: 空 Scaner 队列, 如果没有新的任务, "
+                    f"{sync_config.timeout - (time.time() - sync_config.start_time):d}"
+                    f"秒后退出"
+                )
 
     def start(self, queue: Queue) -> threading.Thread:
         _t = threading.Thread(target=self.run, args=(queue,), name="workers_main")
@@ -274,15 +285,23 @@ class Workers:
 
 
 if __name__ == "__main__":
-    from alist_sdk import AlistPath
+    from alist_sdk import AlistPath, login_server
 
-    _w = Worker(
-        type="copy",
-        need_backup=False,
-        source_path=AlistPath("http://local:/sc"),
-        target_path="http://target_path",
+    _w = Worker.model_validate(
+        {
+            "owner": "test",
+            "created_at": "2024-02-29T23:17:46.992805",
+            "type": "copy",
+            "need_backup": False,
+            "backup_dir": None,
+            "source_path": "http://localhost:5244/local/config.json",
+            "target_path": "http://localhost:5244/ftp/config.json",
+            "id": "6b19d34f229c22de4073db8b4feff8932d773ac2",
+        }
     )
+
+    for s in sync_config.alist_servers:
+        login_server(**s.dump_for_alist_path())
+
     print(_w.tmp_file, type(_w.source_path), _w.target_path)
-    print()
-    print(_w.model_dump())
-    print(_w.model_dump(mode="json"))
+    _w.run()

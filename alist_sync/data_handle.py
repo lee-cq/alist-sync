@@ -89,7 +89,7 @@ class MongoHandle(HandleBase):
         else:
             data = {k: worker.__dict__.get(k) for k in field}
 
-        logger.debug(f"更新Worker[{worker.id}]: {data}")
+        logger.debug(f"Worker[{worker.id}]: Update: {data}")
         return self._workers.update_one(
             {"_id": worker.id},
             {"$set": data},
@@ -101,6 +101,7 @@ class MongoHandle(HandleBase):
         return self._workers.delete_one({"_id": worker_id})
 
     def get_worker(self, worker_id: str):
+        logger.debug("获取Worker: %s", worker_id)
         return self._workers.find_one({"_id": worker_id})
 
     def get_workers(self, query=None) -> Iterable:
@@ -160,7 +161,9 @@ class ShelveHandle(HandleBase):
         self._items = shelve.open(
             str(save_dir.joinpath("alist_cache_items.shelve")), writeback=True
         )
-        self._logs = open(str(save_dir.joinpath("alist-sync-files.log", "a+")))
+        self._logs = save_dir.joinpath(
+            "alist-sync-files.log",
+        ).open("a+")
 
     def __del__(self):
         self._workers.close()
@@ -168,25 +171,32 @@ class ShelveHandle(HandleBase):
         self._logs.close()
 
     def create_log(self, worker: "Worker"):
-        logger.info(f"create log for: {worker.id}")
+        logger.debug(f"create log for: {worker.id}")
         self._logs.write(worker.model_dump_json())
 
     def update_worker(self, worker: "Worker", *field):
-        self._workers[worker.id] = worker
+        logger.debug(f"Shelve[{worker.id}] update to workers")
+        self._workers[worker.id] = worker.model_dump(mode="json")
+        self._workers.sync()
 
     def delete_worker(self, worker_id: str):
-        logger.info(f"Worker[{worker_id}] remove from workers")
-        self._workers.pop(worker_id)
+        logger.debug(f"Worker[{worker_id}] remove from workers")
+        try:
+            self._workers.pop(worker_id)
+        except KeyError:
+            pass
 
     def get_worker(self, worker_id: str):
+        logger.debug(f"get Worker[{worker_id}] from workers")
         return self._workers.get(worker_id)
 
     def get_workers(self, query=None) -> Iterable["Worker"]:
+        logger.debug(f"get Workers from workers")
         for _w in self._workers.values():
             yield _w
 
     def load_locker(self) -> set[AlistPath]:
-        logger.info("正在加载Shelve中保存的锁。")
+        logger.debug("正在加载Shelve中保存的锁。")
         return {
             AlistPath(p)
             for _w in self._workers.values()
@@ -198,6 +208,7 @@ class ShelveHandle(HandleBase):
         return path in self.load_locker()
 
     def update_file_item(self, path: AlistPath, item, *field):
+        logger.debug(f"FileItem[{path}] update to items")
         self._items[path.as_uri()] = {
             "id": path,
             "update_time": datetime.datetime.now(),
@@ -205,4 +216,5 @@ class ShelveHandle(HandleBase):
         }
 
     def get_file_item(self, item_id: AlistPath):
+        logger.debug(f"get FileItem[{item_id}] from items")
         return self._items.get(item_id.as_uri(), {}).get("item")

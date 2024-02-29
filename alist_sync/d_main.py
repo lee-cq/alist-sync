@@ -87,8 +87,8 @@ def main():
 
 
 if __name__ == "__main__":
-    logger_alist_sync = logging.getLogger("alist-sync")
-    logger_alist_sync.setLevel(logging.DEBUG)
-    logger_alist_sync.addHandler(logging.StreamHandler())
-    logger.info("Begin...")
+    # logger_alist_sync = logging.getLogger("alist-sync")
+    # logger_alist_sync.setLevel(logging.DEBUG)
+    # logger_alist_sync.addHandler(logging.StreamHandler())
+    # logger.info("Begin...")
     main()

@@ -199,11 +199,29 @@ def sync_incr(
 
 
 @app.command("test-config")
-def t_config():
+def t_config(config_file: str = Option(None, "--config", "-c", help="配置文件路径")):
     """测试配置"""
     from alist_sync.config import create_config
 
-    echo(create_config().dump_to_yaml())
+    if config_file and Path(config_file).exists():
+        os.environ["ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
+
+    _c = create_config()
+    echo(_c.dump_to_yaml())
+    logger.info("Done.")
+
+
+@app.command("sync")
+def sync(config_file: str = Option(None, "--config", "-c", help="配置文件路径")):
+    """同步任务"""
+    from alist_sync.config import create_config
+    from alist_sync.d_main import main
+
+    if config_file and Path(config_file).exists():
+        os.environ["ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
+
+    create_config()
+    return main()
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ from threading import Thread
 from pathlib import PurePosixPath
 
 from alist_sync.base_sync import SyncBase
-from alist_sync.models import AlistServer
+from alist_sync.config import AlistServer
 
 
 class SyncIncr(SyncBase):
