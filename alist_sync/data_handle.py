@@ -77,7 +77,7 @@ class MongoHandle(HandleBase):
     def __init__(self, mongodb: "Database"):
         self._workers: "Collection" = mongodb.workers
         self._items: "Collection" = mongodb.items
-        self._logs: "Collection" = mongodb.create_collection()
+        self._logs: "Collection" = mongodb.logs
 
     def create_log(self, worker: "Worker"):
         logger.info(f"create log {worker.id} {worker.status}")
@@ -104,6 +104,7 @@ class MongoHandle(HandleBase):
         return self._workers.find_one({"_id": worker_id})
 
     def get_workers(self, query=None) -> Iterable:
+        logger.debug("查询未完成的Worker.")
         if query is None:
             query = {}
         return self._workers.find(query)

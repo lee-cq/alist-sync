@@ -42,10 +42,10 @@ def scaner(url: AlistPath, _queue):
     assert url.exists(), f"目录不存在{url.as_uri()}"
 
     s_sum = []
-    pool = MyThreadPoolExecutor(5)
-    pool.submit(_scaner, url, s_sum)
-    while s_sum:
-        time.sleep(2)
+    with MyThreadPoolExecutor(5, thread_name_prefix=f"scaner_{url.as_uri()}") as pool:
+        pool.submit(_scaner, url, s_sum)
+        while s_sum:
+            time.sleep(2)
 
 
 def checker(sync_group: SyncGroup, _queue_worker: Queue) -> threading.Thread | None:
@@ -88,7 +88,7 @@ def main():
 
 if __name__ == "__main__":
     logger_alist_sync = logging.getLogger("alist-sync")
-    logger_alist_sync.setLevel(logging.INFO)
+    logger_alist_sync.setLevel(logging.DEBUG)
     logger_alist_sync.addHandler(logging.StreamHandler())
     logger.info("Begin...")
     main()

@@ -4,6 +4,7 @@ import hashlib
 import logging
 import selectors
 import sys
+import threading
 from pathlib import Path
 from typing import Iterable
 
@@ -22,6 +23,8 @@ __all__ = [
     "timeout_input",
     "clear_cache",
     "clear_path",
+    "all_thread_name",
+    "prefix_in_threads",
 ]
 
 
@@ -69,6 +72,19 @@ def is_task_all_success(tasks: Iterable | dict) -> bool:
     if isinstance(tasks, dict):
         tasks = tasks.values()
     return all(1 if i.status == "success" else 0 for i in tasks)
+
+
+def all_thread_name() -> set:
+    """返回全部的线程名字"""
+    return {t.name for t in threading.enumerate()}
+
+
+def prefix_in_threads(prefix) -> bool:
+    """在活动的线程，是否存指定的线程名前缀"""
+    for name in all_thread_name():
+        if prefix in name:
+            return True
+    return False
 
 
 def timeout_input(msg, default, timeout=3):

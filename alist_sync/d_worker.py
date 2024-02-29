@@ -2,8 +2,9 @@ import atexit
 import datetime
 import logging
 import threading
+import time
 from pathlib import Path
-from queue import Queue
+from queue import Queue, Empty
 from typing import Literal, Any
 
 from pydantic import BaseModel, computed_field, Field
@@ -11,7 +12,7 @@ from pymongo.collection import Collection
 from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 
 from alist_sync.config import create_config
-from alist_sync.common import sha1
+from alist_sync.common import sha1, prefix_in_threads
 from alist_sync.thread_pool import MyThreadPoolExecutor
 
 sync_config = create_config()
@@ -127,27 +128,33 @@ class Worker(BaseModel):
         # download
         _tmp = self.tmp_file.open("wb")
         with self.source_path.client.stream(
-            self.source_path.get_download_uri()
+            "GET",
+            self.source_path.get_download_uri(),
+            follow_redirects=True,
         ) as _res:
-            for i in _res.iter_by(chunk_size=1024 * 1024):
+            for i in _res.iter_bytes(chunk_size=1024 * 1024):
                 _tmp.write(i)
-        _tmp.seek(0)
+        _tmp.close()
         self.update(status="downloaded")
         # upload
-        self.target_path.client.verify_request(
-            "PUT",
-            "/api/fs/put",
-            headers={
-                "As-Task": "false",
-                "Content-Type": "application/octet-stream",
-                "Last-Modified": str(
-                    int(self.source_path.stat().modified.timestamp() * 1000)
-                ),
-                "File-Path": urllib.parse.quote_plus(str(self.target_path.as_posix())),
-            },
-            content=_tmp,
-        )
+        with self.tmp_file.open("rb") as fs:
+            res = self.target_path.client.verify_request(
+                "PUT",
+                "/api/fs/put",
+                headers={
+                    "As-Task": "false",
+                    "Content-Type": "application/octet-stream",
+                    "Last-Modified": str(
+                        int(self.source_path.stat().modified.timestamp() * 1000)
+                    ),
+                    "File-Path": urllib.parse.quote_plus(
+                        str(self.target_path.as_posix())
+                    ),
+                },
+                content=fs,
+            )
 
+        assert res.code == 200
         self.update(status="uploaded")
 
     def copy_type(self):
@@ -238,15 +245,29 @@ class Workers:
 
     def run(self, queue: Queue):
         """"""
-        self.lockers |= sync_config.handle.load_locker()
-        for i in sync_config.handle.get_workers():
-            self.add_worker(Worker(**i), is_loader=True)
-
+        # self.lockers |= sync_config.handle.load_locker()
+        # for i in sync_config.handle.get_workers():
+        #     self.add_worker(Worker(**i), is_loader=True)
         while True:
-            self.add_worker(queue.get())
+            if (
+                queue.empty()
+                and sync_config.daemon is False
+                and not prefix_in_threads("checker_")
+                and time.time() - sync_config.start_time > sync_config.timeout
+            ):
+                logger.info(f"等待Worker执行完成, 排队中的数量: {self.thread_pool.work_qsize()}")
+                self.thread_pool.shutdown(wait=True)
+                logger.info(f"循环线程退出 - {threading.current_thread().name}")
+                break
+
+            try:
+                self.add_worker(queue.get(timeout=3))
+            except Empty:
+                logger.debug("Workers: 空Worker Queue.")
+                pass
 
     def start(self, queue: Queue) -> threading.Thread:
-        _t = threading.Thread(target=self.run, args=(queue,))
+        _t = threading.Thread(target=self.run, args=(queue,), name="workers_main")
         _t.start()
         logger.info("Worker Main Thread Start...")
         return _t

@@ -2,6 +2,7 @@ import builtins
 import json
 import logging
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 from functools import cached_property, lru_cache
@@ -142,6 +143,8 @@ class Config(BaseModel):
         alias="cache_dir",
     )
 
+    timeout: int = Field(10)
+
     daemon: bool = os.getenv("ALIST_SYNC_DAEMON", "false").lower() in (
         "true",
         "1",
@@ -162,6 +165,10 @@ class Config(BaseModel):
     sync_groups: list[SyncGroup] = []
 
     create_time: datetime = datetime.now()
+
+    @cached_property
+    def start_time(self) -> int:
+        return int(time.time())
 
     @cached_property
     def cache_dir(self) -> Path:
