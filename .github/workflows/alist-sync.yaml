@@ -1,0 +1,55 @@
+name: Alist Sync
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python v4
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install alist-sync
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+
+      - name: Load Cache
+        uses: actions/cache@v4
+        with:
+          a: b
+
+      - name: Install and Init Alist Server
+        env:
+          _ALIST_CONFIG: ${{}}
+          _ALIST_ADMIN_PASSWORD: ${{}}
+        run: |
+          cat > "alist-config.json" << EOF
+          ${{ secrets.ALIST_CONFIG }}
+          EOF
+          bash -ex bootstrap.sh init-alist     
+
+      - name: Create Storage for Alist
+        env:
+          _ALIST_BACKUP: ${{}}
+          _ALIST_ADMIN_PASSWORD: ${}
+          _ALIST_BACKUP_URL: ${{}}
+          _ALIST_BACKUP_USERNAME: ${{}}
+          _ALIST_BACKUP_PASSWORD: ${{}}
+        run: |
+          cat > alist-backup-config.json < EOF
+          ${{ secrets.ALIST_CONFIG }}
+          EOF
+          python3 tools/create_storage.py
+
+      - name: RUN
+        env:
+          SYNC_CONFIG: ${{}}
+        run: |
+          ...

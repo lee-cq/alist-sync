@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
-cd "$(dirname "$0")" || exit
+cd "${1:-$(dirname "$0")}" || exit
+
+echo "INSTALL ALIST. PWD: $(pwd)"
+
+__AIST_ADMIN_PASSWORD="${_ALIST_ADMIN_PASSWORD:-123456}"
 
 mkdir -p alist
 cd alist || exit
@@ -37,5 +41,5 @@ if [[ ! -f alist && ! -f "alist.exe" ]]; then
 fi
 
 rm -rf data/ test_dir/
-./alist admin set 123456
+./alist admin set "${__AIST_ADMIN_PASSWORD}"
 ./alist restart
