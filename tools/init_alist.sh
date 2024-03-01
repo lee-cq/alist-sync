@@ -28,7 +28,7 @@ esac
 filename="alist-${platform}-${cpu}${fix}"
 export download_url="https://github.com/alist-org/alist/releases/download/v${VERSION}/${filename}"
 
-if [[ ! -f alist && ! -f "alist.exe" ]]; then
+if [[ ! -f "alist" && ! -f "alist.exe" ]]; then
     set -e
     echo "Will Install ${download_url}"
     curl -SLkO "$download_url"

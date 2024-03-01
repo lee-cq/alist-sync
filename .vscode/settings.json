@@ -7,6 +7,6 @@
         "editor.formatOnPaste": true,
         "diffEditor.ignoreTrimWhitespace": false,
         "editor.formatOnType": true,
-        "editor.wordBasedSuggestions": false
+        "editor.wordBasedSuggestions": "off"
     }
 }

@@ -32,7 +32,7 @@ alist)
 alist-init)
     pkill alist
     rm -rf alist/*
-    sh tools/init_alist.sh alist/
+    bash tools/init_alist.sh .
     ;;
 
 clear)
