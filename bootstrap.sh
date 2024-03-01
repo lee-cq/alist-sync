@@ -42,7 +42,7 @@ clear)
 test)
     whereis pytest || pip install pytest
     clear
-    ./tests/alist/alist stop || pkill alist
+    ./alist/alist stop || pkill alist
     all_clear
     shift 1
     pytest -v "$@"

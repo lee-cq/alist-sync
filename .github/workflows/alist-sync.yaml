@@ -1,4 +1,5 @@
 name: Alist Sync
+run-name: ${{}}
 
 on:
   workflow_dispatch:
@@ -14,7 +15,7 @@ on:
 
 jobs:
   run:
-    name: alist-sync
+    name: "sync-actions"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

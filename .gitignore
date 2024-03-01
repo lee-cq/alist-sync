@@ -8,6 +8,11 @@ tmp/
 config.json
 config.yaml
 
+.alist-sync-cache/
+alist_sync/.alist-sync-cache/
+alist/
+tools/alist/
+
 # C extensions
 *.so
 

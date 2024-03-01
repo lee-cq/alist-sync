@@ -1,6 +1,7 @@
 import atexit
 import datetime
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -9,11 +10,13 @@ from typing import Literal, Any
 
 from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
+from httpx import Client
 from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 
 from alist_sync.config import create_config
 from alist_sync.common import sha1, prefix_in_threads
 from alist_sync.thread_pool import MyThreadPoolExecutor
+from alist_sync.version import __version__
 
 sync_config = create_config()
 
@@ -31,6 +34,10 @@ WorkerStatus = Literal[
 ]
 
 logger = logging.getLogger("alist-sync.worker")
+
+downloader_client = Client(
+    headers={"User-Agent": sync_config.ua or f"alist-sync/{__version__}"}
+)
 
 
 # noinspection PyTypeHints
@@ -128,7 +135,7 @@ class Worker(BaseModel):
 
         # download
         _tmp = self.tmp_file.open("wb")
-        with self.source_path.client.stream(
+        with downloader_client.stream(
             "GET",
             self.source_path.get_download_uri(),
             follow_redirects=True,
@@ -137,6 +144,7 @@ class Worker(BaseModel):
                 _tmp.write(i)
         _tmp.close()
         self.update(status="downloaded")
+
         # upload
         with self.tmp_file.open("rb") as fs:
             res = self.target_path.client.verify_request(
@@ -163,15 +171,14 @@ class Worker(BaseModel):
         """复制任务"""
         logger.debug(f"Worker[{self.short_id}] Start Copping")
 
-        # if self.source_path.stat().size < 10 * 1024 * 1024:
-        #     self.target_path.unlink(missing_ok=True)
-        #     self.target_path.parent.mkdir(parents=True, exist_ok=True)
-        #     _res = self.target_path.write_bytes(self.source_path.read_bytes())
-        #
-        # else:
+        self.target_path.unlink(missing_ok=True)
+        self.target_path.parent.mkdir(parents=True, exist_ok=True)
         self.copy_single_stream()
 
-        assert self.target_path.re_stat().size == self.source_path.stat().size
+        assert (
+            self.target_path.re_stat(retry=5, timeout=2).size
+            == self.source_path.stat().size
+        )
         return self.update(status="copied")
 
     def delete_type(self):
@@ -209,6 +216,8 @@ class Worker(BaseModel):
             logger.error(f"worker[{self.short_id}] 出现错误: {_e}")
             self.error_info = str(_e)
             self.update(status="failed")
+            if os.getenv("ALIST_SYNC_DEBUG"):
+                raise _e
 
 
 class Workers:
@@ -278,7 +287,11 @@ class Workers:
                 )
 
     def start(self, queue: Queue) -> threading.Thread:
-        _t = threading.Thread(target=self.run, args=(queue,), name="workers_main")
+        _t = threading.Thread(
+            target=self.run,
+            args=(queue,),
+            name="workers_main",
+        )
         _t.start()
         logger.info("Worker Main Thread Start...")
         return _t
@@ -290,13 +303,16 @@ if __name__ == "__main__":
     _w = Worker.model_validate(
         {
             "owner": "test",
-            "created_at": "2024-02-29T23:17:46.992805",
+            "created_at": "2024-03-01T15:59:37.222074",
+            "done_at": "2024-03-01T15:59:42.568337",
             "type": "copy",
             "need_backup": False,
             "backup_dir": None,
-            "source_path": "http://localhost:5244/local/config.json",
-            "target_path": "http://localhost:5244/ftp/config.json",
-            "id": "6b19d34f229c22de4073db8b4feff8932d773ac2",
+            "source_path": "http://localhost:5244/onedrive/HuaZhang.sqlite",
+            "target_path": "http://localhost:5244/Drive-New/HuaZhang.sqlite",
+            "status": "init",
+            "error_info": "",
+            "id": "228e0fa2906875ea18c83f4aa4c40aaa84d1d47e",
         }
     )
 
