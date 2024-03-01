@@ -7,10 +7,11 @@
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-python.isort",
-        "ms-python.autopep8",
+        "ms-python.black-formatter",
         "ms-python.debugpy",
 
         "github.github-vscode-theme",
-        "github.copilot"
+        "github.copilot",
+        "mongodb.mongodb-vscode"
     ]
 }

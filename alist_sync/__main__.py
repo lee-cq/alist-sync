@@ -34,7 +34,6 @@ _verify: bool = Option(
     False,
     "--verify",
     "-v",
-    # is_flag=True,
     help="Verify SSL Certificates",
 )
 
@@ -222,6 +221,20 @@ def sync(config_file: str = Option(None, "--config", "-c", help="配置文件路
 
     create_config()
     return main()
+
+
+@app.command("get-info")
+def cli_get(path :str):
+    """"""
+    from alist_sdk import login_server, AlistPath
+    from alist_sync.config import sync_config
+
+    for s in sync_config.alist_servers:
+        login_server(**s.dump_for_alist_path())
+    
+    echo(
+        AlistPath(path).re_stat(retry=5, timeout=3).model_dump_json(indent=2)
+    )
 
 
 if __name__ == "__main__":

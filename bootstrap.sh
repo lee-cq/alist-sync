@@ -48,6 +48,11 @@ test)
     pytest -v "$@"
     ;;
 
+main )
+    shift
+    python -m alist_sync $@
+    ;;
+
 debugger)
     all_clear
     clear

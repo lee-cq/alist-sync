@@ -144,6 +144,7 @@ class Config(BaseModel):
     )
 
     timeout: int = Field(10)
+    ua: str = None
 
     daemon: bool = os.getenv("ALIST_SYNC_DAEMON", "false").lower() in (
         "true",
