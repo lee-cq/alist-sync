@@ -61,8 +61,8 @@ jobs:
           _RELOAD_STORAGE: ${{ github.event.inputs.reload_storage }}
         run: |
           # 这将会导入全部的内容包括：设置，元数据，用户，存储器。
-          
-          cat > alist-backup-config.json < EOF
+          echo $(pwd)
+          cat > alist-backup-config.json << EOF
           ${{ secrets.ALIST_BACKUP_CONFIG }}
           EOF
           python3 tools/create_storage.py
@@ -72,7 +72,7 @@ jobs:
           SYNC_CONFIG: ${{secrets.SYNC_CONFIG}}
           _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
         run: |
-          cat > alist-backup-config.json < EOF
+          cat > alist-backup-config.json << EOF
           ${{ secrets.ALIST_BACKUP_CONFIG }}
           EOF
           python3 -m alist_sync sync -c $SYNC_CONFIG
