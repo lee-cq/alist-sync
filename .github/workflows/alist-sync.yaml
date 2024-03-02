@@ -28,11 +28,6 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Install alist-sync
-        run: |
-          pip install --upgrade pip
-          pip install -e .
-
       - name: Load Cache
         id: alist-data-cache
         uses: actions/cache@v4
@@ -41,14 +36,16 @@ jobs:
           path: |
             ./.alist-sync-cache/*.db
             ./.alist-sync-cache/*.json
+            ./.alist-sync-cache/*.shelve
             ./alist/data
 
       - name: Install and Init Alist Server
         env:
           _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
         run: |
+          bash -ex bootstrap.sh install
           # init-alist 总是会重置管理员密码为环境变量。
-          bash -ex bootstrap.sh init-alist.sh
+          bash -x bootstrap.sh alist-init
 
 
       - name: Create Storage for Alist if load cache failed
