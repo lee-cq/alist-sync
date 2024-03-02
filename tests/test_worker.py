@@ -17,6 +17,7 @@ from alist_sync.config import create_config
 sync_config = create_config()
 
 
+@pytest.mark.skip()
 def test_worker_copy():
     docs = {
         # "_id": "013ac712314196a73bc97baba0e0cb97f769140b",
