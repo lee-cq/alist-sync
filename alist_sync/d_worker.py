@@ -162,9 +162,7 @@ class Worker(BaseModel):
                     "Last-Modified": str(
                         int(self.source_path.stat().modified.timestamp() * 1000)
                     ),
-                    "File-Path": urllib.parse.quote(
-                        str(self.target_path.as_posix())
-                    ),
+                    "File-Path": urllib.parse.quote(str(self.target_path.as_posix())),
                 },
                 content=fs,
             )
@@ -229,9 +227,7 @@ class Worker(BaseModel):
         try:
             if self.status in ["done", "failed"]:
                 return
-            if self.need_backup and self.status in [
-                "init",
-            ]:
+            if self.need_backup and self.status in ["init"]:
                 self.backup()
 
             if self.type == "copy" and self.status in ["init", "back-upped"]:
@@ -246,7 +242,7 @@ class Worker(BaseModel):
             logger.error(f"worker[{self.short_id}] 出现错误: {_e}")
             self.error_info = str(_e)
             self.update(status="failed")
-            if os.getenv("ALIST_SYNC_DEBUG"):
+            if sync_config.debug:
                 raise _e
 
 

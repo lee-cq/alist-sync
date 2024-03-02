@@ -31,6 +31,9 @@ PAlistPathType = Annotated[
     ),
 ]
 
+TrueValues = {"true", "1", "yes", "on", "y", "t", "1"}
+FalseValues = {"false", "0", "no", "off", "n", "f", "0"}
+
 
 def getenv(name, default=None):
     """获取环境变量"""
@@ -139,15 +142,7 @@ class Config(BaseModel):
     timeout: int = Field(10)
     ua: str = None
 
-    daemon: bool = getenv("ALIST_SYNC_DAEMON", "false").lower() in (
-        "true",
-        "1",
-        "yes",
-        "on",
-        "y",
-        "t",
-        "1",
-    )
+    daemon: bool = getenv("ALIST_SYNC_DAEMON", "false").lower() in TrueValues
 
     name: str = getenv("ALIST_SYNC_NAME", "alist-sync")
 
@@ -160,6 +155,8 @@ class Config(BaseModel):
 
     create_time: datetime = datetime.now()
     logs: dict = None
+
+    debug: bool = getenv("ALIST_SYNC_DEBUG", "false").lower() in TrueValues
 
     def __init__(self, **data: Any):
         super().__init__(**data)

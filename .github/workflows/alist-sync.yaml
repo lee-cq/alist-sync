@@ -1,19 +1,25 @@
 name: Alist Sync
 
-env:
-  _ALIST_SYNC_NAME: "action-${{github.actor}}-${{github.run_id}}-${{github.run_number}}"
-
 on:
   workflow_dispatch:
     inputs:
       reload_storage:
-        description: |
-          是否重新创建存储: true or false
-          默认情况下，如果存储已经存在，则不会重新创建
-          如果指定了true，则会删除全部的存储器，并从新载入
+        description: 删除现有存储库，并从配置文件或远程配置中重新创建存储器
+        type: boolean
         required: false
         default: false
+
+
+      debug:
+        description: 开启调试模式
         type: boolean
+        required: false
+        default: false
+
+env:
+  _ALIST_SYNC_NAME: "action-${{github.actor}}-${{github.run_id}}-${{github.run_number}}"
+  _ALIST_SYNC_DEBUG: ${{ github.event.inputs.debug }}
+  _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
 
 jobs:
   run:
@@ -67,13 +73,14 @@ jobs:
           EOF
           python3 tools/create_storage.py
 
-      - name: RUN
-        env:
-          _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
+      - name: RUN Alist Sync
         run: |
           cat > config.yaml << EOF
           ${{ secrets.SYNC_CONFIG }}
           EOF
           set -ex
+          export TERM=dumb
+          export FORCE_COLOR=true
+          export COLUMNS=160
           ./bootstrap.sh main test-config
           ./bootstrap.sh main sync 

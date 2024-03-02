@@ -41,16 +41,22 @@ def t_ignore(path, match):
 @app.command("sync")
 def sync(
     config_file: str = Option(None, "--config", "-c", help="配置文件路径"),
-    debug: bool = Option(False, "--debug", help="调试模式, 将以单线程启动"),
+    debug: bool = Option(
+        False,
+        "--debug",
+        envvar="ALIST_SYNC_DEBUG",
+        help="调试模式, 将以单线程启动",
+    ),
 ):
     """同步任务"""
-    from alist_sync.config import create_config
+    from alist_sync.config import create_config, getenv
     from alist_sync.d_main import main, main_debug
 
     if config_file and Path(config_file).exists():
         os.environ["ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
         os.environ["_ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
-
+    if getenv("ALIST_SYNC_DEBUG", "false").lower() == "true":
+        debug = True
     create_config()
     if debug:
         echo("调试模式启动")
