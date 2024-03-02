@@ -7,6 +7,7 @@ local_test*
 tmp/
 config.json
 config.yaml
+.DS_Store
 
 .alist-sync-cache/
 alist_sync/.alist-sync-cache/

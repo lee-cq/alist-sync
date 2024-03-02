@@ -23,6 +23,7 @@ def t_config(config_file: str = Option(None, "--config", "-c", help="配置文�
 
     if config_file and Path(config_file).exists():
         os.environ["ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
+        os.environ["_ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
 
     _c = create_config()
     echo(_c.dump_to_yaml())
@@ -48,6 +49,7 @@ def sync(
 
     if config_file and Path(config_file).exists():
         os.environ["ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
+        os.environ["_ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
 
     create_config()
     if debug:
@@ -60,7 +62,9 @@ def sync(
 def cli_get(path: str):
     """"""
     from alist_sdk import login_server, AlistPath
-    from alist_sync.config import sync_config
+    from alist_sync.config import create_config
+
+    sync_config = create_config()
 
     for s in sync_config.alist_servers:
         login_server(**s.dump_for_alist_path())

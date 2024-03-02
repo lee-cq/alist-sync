@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 alist_config = json.loads(PROJECT_ROOT.joinpath("alist/data/config.json").read_text())
 
 alist_port = alist_config["scheme"]["http_port"]
-admin_password = os.getenv("_ALIST_ADMIN_PASSWORD", "123456")
+admin_password = os.getenv("_ALIST_ADMIN_PASSWORD", ) or "123456"
 
 remote_url = os.getenv("_ALIST_BACKUP_URL")
 remote_username = os.getenv("_ALIST_BACKUP_USERNAME")
@@ -30,9 +30,11 @@ local_client = ExtraClient(
     password=admin_password,
 )
 
+print("local_client =", admin_password)
 # 如果--， 删除全部存储器
-if os.getenv("_RELOAD_STORAGE"):
-    for i in local_client.admin_storage_list().data.content:
+print("_RELOAD_STORAGE =", os.getenv("_RELOAD_STORAGE"))
+if os.getenv("_RELOAD_STORAGE") == "true":
+    for i in local_client.admin_storage_list().data.content or []:
         local_client.admin_storage_delete(i.id)
 
 # 创建本地存储器

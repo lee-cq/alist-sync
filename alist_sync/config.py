@@ -1,5 +1,4 @@
 import builtins
-import json
 import logging
 import os
 import time
@@ -49,7 +48,7 @@ def create_config():
 
     _sync_config = Config.load_from_yaml(config_file)
     setattr(builtins, "sync_config", _sync_config)
-    return sync_config
+    return _sync_config
 
 
 class AlistServer(BaseModel):
@@ -249,7 +248,7 @@ class Config(BaseModel):
         )
 
 
-sync_config = create_config()
+# sync_config = create_config()
 
 
 if __name__ == "__main__":

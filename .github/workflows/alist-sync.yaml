@@ -75,4 +75,6 @@ jobs:
           cat > alist-backup-config.json << EOF
           ${{ secrets.ALIST_BACKUP_CONFIG }}
           EOF
-          python3 -m alist_sync sync -c $SYNC_CONFIG
+          set -ex
+          ./bootstrap.sh main test-config
+          ./bootstrap.sh main sync -c alist-backup-config.json
