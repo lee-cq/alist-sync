@@ -9,16 +9,15 @@
 import sys
 import pytest
 
-from alist_sdk.path_lib import PureAlistPath, AlistPath, login_server
-
-from alist_sync.d_worker import Worker, Workers
-from alist_sync.config import create_config
-
-sync_config = create_config()
+from alist_sdk.path_lib import login_server
 
 
 @pytest.mark.skip()
 def test_worker_copy():
+    from alist_sync.d_worker import Worker
+    from alist_sync.config import create_config
+
+    sync_config = create_config()
     docs = {
         # "_id": "013ac712314196a73bc97baba0e0cb97f769140b",
         "backup_dir": None,
