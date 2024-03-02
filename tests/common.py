@@ -16,6 +16,7 @@ class StorageInfo(NamedTuple):
 
 
 WORKDIR = Path(__file__).parent
+WORKDIR.mkdir(exist_ok=True, parents=True)
 DATA_DIR = StorageInfo("/local", WORKDIR / "alist/test_dir")
 DATA_DIR_DST = StorageInfo("/local_dst", WORKDIR / "alist/test_dir_dst")
 DATA_DIR_DST2 = StorageInfo("/local_dst2", WORKDIR / "alist/test_dir_dst2")

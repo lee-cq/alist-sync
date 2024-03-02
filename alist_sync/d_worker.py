@@ -73,13 +73,12 @@ class Worker(BaseModel):
     def __repr__(self):
         return f"<Worker {self.type}: {self.source_path} -> {self.target_path}>"
 
-
     def __del__(self):
         try:
             self.tmp_file.unlink(missing_ok=True)
         finally:
             pass
-            
+
     @computed_field(return_type=str, alias="_id")
     @property
     def id(self) -> str:

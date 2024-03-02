@@ -15,8 +15,7 @@ from alist_sdk.tools.client import ExtraClient
 
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
-alist_config = json.loads(PROJECT_ROOT.joinpath(
-    "alist/data/config.json").read_text())
+alist_config = json.loads(PROJECT_ROOT.joinpath("alist/data/config.json").read_text())
 
 alist_port = alist_config["scheme"]["http_port"]
 admin_password = os.getenv("_ALIST_ADMIN_PASSWORD", "123456")
@@ -83,8 +82,4 @@ if remote_url:
 
 _bk_file = PROJECT_ROOT.joinpath("alist-backup-config.json")
 if _bk_file.exists():
-    local_client.import_configs(
-        json.loads(
-            _bk_file.read_text()
-        )
-    )
+    local_client.import_configs(json.loads(_bk_file.read_text()))
