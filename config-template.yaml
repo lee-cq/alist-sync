@@ -52,6 +52,7 @@ sync_groups:
     # 详情参考标准库文档 https://docs.python.org/3/library/fnmatch.html
     # 后面可能会重构，以支持 Linux Glob 模式。
     # 其路径必须相对与Group中定义的目录，或者使用*开头
+    # .alist-sync* 将自动添加到黑名单中
     # 例子：
     # 忽略 http://localhost:5244/test1/base/ 目录下的所有目录及文件： "base/*"
     # 忽略所有bfstm文件： "*.bfstm"

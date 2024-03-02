@@ -79,41 +79,11 @@ class AlistServer(BaseModel):
         _data["server"] = _data.pop("base_url")
         return _data
 
-    def storages(self) -> list[dict]:
-        """返回给定的 storage_config 中包含的storages"""
 
-        def is_storage(_st):
-            if not isinstance(_st, dict):
-                return False
-            if "mount_path" in _st and "driver" in _st:
-                return True
-            return False
-
-        if not self.storage_config or self.storage_config == Path():
-            return []
-        if not self.storage_config.exists():
-            raise FileNotFoundError(f"找不到文件：{self.storage_config}")
-
-        _load_storages = json.load(self.storage_config.open())
-        if isinstance(_load_storages, list):
-            _load_storages = [_s for _s in _load_storages if is_storage(_s)]
-            if _load_storages:
-                return _load_storages
-            raise KeyError()
-
-        if isinstance(_load_storages, dict):
-            if "storages" in _load_storages:
-                _load_storages = [
-                    _s for _s in _load_storages["storages"] if is_storage(_s)
-                ]
-                if _load_storages:
-                    return _load_storages
-                raise KeyError()
-            if is_storage(_load_storages):
-                return [
-                    _load_storages,
-                ]
-            raise KeyError("给定的")
+def set_add(x) -> set:
+    x = set(x)
+    x.add(".alist-sync*")
+    return x
 
 
 class SyncGroup(BaseModel):
@@ -126,8 +96,8 @@ class SyncGroup(BaseModel):
     interval: int = 300
     need_backup: bool = False
     backup_dir: str = ".alist-sync-backup"
-    blacklist: list[str] = []
-    whitelist: list[str] = []
+    blacklist: Annotated[list[str], BeforeValidator(lambda x: set_add(x))] = []
+    whitelist: Annotated[list[str], BeforeValidator(lambda x: set_add(x))] = []
     group: list[PAlistPathType] = Field(min_length=2)
 
 
