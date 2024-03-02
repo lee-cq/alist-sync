@@ -2,15 +2,13 @@ import asyncio
 import builtins
 import hashlib
 import logging
+import os
 import selectors
 import sys
 import threading
 from pathlib import Path
 from typing import Iterable
 
-from alist_sync.config import create_config
-
-cache_dir = create_config().cache_dir
 
 logger = logging.getLogger("alist-sync.common")
 
@@ -21,7 +19,6 @@ __all__ = [
     "async_all_task_names",
     "is_task_all_success",
     "timeout_input",
-    "clear_cache",
     "clear_path",
     "all_thread_name",
     "prefix_in_threads",
@@ -44,11 +41,6 @@ def clear_path(path: Path):
         elif i.is_dir():
             clear_path(i)
             i.rmdir()
-
-
-def clear_cache():
-    """清除缓存"""
-    clear_path(cache_dir)
 
 
 def sha1(s) -> str:

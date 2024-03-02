@@ -42,7 +42,7 @@ downloader_client = Client(
 
 # noinspection PyTypeHints
 class Worker(BaseModel):
-    owner: str = sync_config.runner_name
+    owner: str = sync_config.name
     created_at: datetime.datetime = datetime.datetime.now()
     done_at: datetime.datetime | None = None
     type: WorkerType

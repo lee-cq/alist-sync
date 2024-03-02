@@ -6,17 +6,36 @@ import time
 from datetime import datetime
 from pathlib import Path
 from functools import cached_property, lru_cache
-from typing import Optional, Literal, TYPE_CHECKING, Any
+from typing import Optional, Literal, TYPE_CHECKING, Any, Annotated
 
 from alist_sdk import AlistPathType, AlistPath
+from alist_sdk.path_lib import AlistPathPydanticAnnotation
 from httpx import URL
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, BeforeValidator
 from pymongo.database import Database
+
 
 if TYPE_CHECKING:
     from alist_sync.data_handle import ShelveHandle, MongoHandle
 
 logger = logging.getLogger("alist-sync.config")
+
+PAlistPathType = Annotated[
+    AlistPathType,
+    AlistPathPydanticAnnotation,
+    BeforeValidator(
+        lambda x: (
+            URL("http://localhost:5244").join(x).__str__()
+            if not URL(x).is_absolute_url
+            else x
+        )
+    ),
+]
+
+
+def getenv(name, default=None):
+    """获取环境变量"""
+    return os.getenv(name, os.getenv("_" + name, default))
 
 
 def create_config():
@@ -24,7 +43,7 @@ def create_config():
     if hasattr(builtins, "sync_config"):
         return builtins.sync_config
 
-    config_file = os.getenv(
+    config_file = getenv(
         "ALIST_SYNC_CONFIG", Path(__file__).parent.parent / "config.yaml"
     )
 
@@ -109,7 +128,7 @@ class SyncGroup(BaseModel):
     backup_dir: str = ".alist-sync-backup"
     blacklist: list[str] = []
     whitelist: list[str] = []
-    group: list[AlistPathType] = Field(min_length=2)
+    group: list[PAlistPathType] = Field(min_length=2)
 
 
 NotifyType = Literal["email", "webhook"]
@@ -138,10 +157,10 @@ class Config(BaseModel):
     def __hash__(self):
         return hash(self._id)
 
-    _id: str = "alist-sync-config"
+    _id: str = getenv("ALIST_SYNC_NAME", "alist-sync")
 
     cache__dir: Path = Field(
-        default=os.getenv(
+        default=getenv(
             "ALIST_SYNC_CACHE_DIR",
             Path(__file__).parent / ".alist-sync-cache",
         ),
@@ -151,7 +170,7 @@ class Config(BaseModel):
     timeout: int = Field(10)
     ua: str = None
 
-    daemon: bool = os.getenv("ALIST_SYNC_DAEMON", "false").lower() in (
+    daemon: bool = getenv("ALIST_SYNC_DAEMON", "false").lower() in (
         "true",
         "1",
         "yes",
@@ -161,9 +180,9 @@ class Config(BaseModel):
         "1",
     )
 
-    runner_name: str = "test"
+    name: str = getenv("ALIST_SYNC_NAME", "alist-sync")
 
-    mongodb_uri: str | None = os.getenv("ALIST_SYNC_MONGODB_URI", None)
+    mongodb_uri: str | None = getenv("ALIST_SYNC_MONGODB_URI", None)
 
     notify: list[EMailNotify | WebHookNotify] = []
 

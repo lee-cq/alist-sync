@@ -1,5 +1,7 @@
 name: Alist Sync
-run-name: ${{}}
+
+env:
+  _ALIST_SYNC_NAME: "action-${{github.actor}}-${{github.run_id}}-${{github.run_number}}"
 
 on:
   workflow_dispatch:
@@ -71,6 +73,7 @@ jobs:
       - name: RUN
         env:
           SYNC_CONFIG: ${{secrets.SYNC_CONFIG}}
+          _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
         run: |
           cat > alist-backup-config.json < EOF
           ${{ secrets.ALIST_BACKUP_CONFIG }}
