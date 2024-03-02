@@ -95,6 +95,6 @@ def setup_function():
     cache_dir.mkdir(parents=True, exist_ok=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     setup_module()
     setup_function()

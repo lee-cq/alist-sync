@@ -98,12 +98,17 @@ class AlistServer(BaseModel):
 
 
 class SyncGroup(BaseModel):
+    def __hash__(self):
+        return hash(self.name + self.type)
+
     enable: bool = True
     name: str
     type: str
     interval: int = 300
     need_backup: bool = False
     backup_dir: str = ".alist-sync-backup"
+    blacklist: list[str] = []
+    whitelist: list[str] = []
     group: list[AlistPathType] = Field(min_length=2)
 
 

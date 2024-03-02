@@ -7,6 +7,7 @@ from pathlib import Path
 from typer import Typer, Option, echo
 
 
+logger = logging.getLogger("alist-sync.__main__")
 app = Typer()
 
 
@@ -28,16 +29,30 @@ def t_config(config_file: str = Option(None, "--config", "-c", help="配置文�
     logger.info("Done.")
 
 
+@app.command("test-ignore")
+def t_ignore(path, match):
+    """测试ignore"""
+    from fnmatch import fnmatchcase
+
+    echo(fnmatchcase(path, match))
+
+
 @app.command("sync")
-def sync(config_file: str = Option(None, "--config", "-c", help="配置文件路径")):
+def sync(
+    config_file: str = Option(None, "--config", "-c", help="配置文件路径"),
+    debug: bool = Option(False, "--debug", help="调试模式, 将以单线程启动"),
+):
     """同步任务"""
     from alist_sync.config import create_config
-    from alist_sync.d_main import main
+    from alist_sync.d_main import main, main_debug
 
     if config_file and Path(config_file).exists():
         os.environ["ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
 
     create_config()
+    if debug:
+        echo("调试模式启动")
+        return main_debug()
     return main()
 
 
@@ -54,11 +69,4 @@ def cli_get(path: str):
 
 
 if __name__ == "__main__":
-    from rich.logging import RichHandler
-
-    logger = logging.getLogger("alist-sync")
-    handler = RichHandler()
-    handler.setLevel("DEBUG")
-    logger.addHandler(handler)
-    logger.setLevel("DEBUG")
     app()

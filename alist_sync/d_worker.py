@@ -162,7 +162,7 @@ class Worker(BaseModel):
                     "Last-Modified": str(
                         int(self.source_path.stat().modified.timestamp() * 1000)
                     ),
-                    "File-Path": urllib.parse.quote_plus(
+                    "File-Path": urllib.parse.quote(
                         str(self.target_path.as_posix())
                     ),
                 },
@@ -170,7 +170,10 @@ class Worker(BaseModel):
             )
 
         assert res.code == 200
-        logger.info(f"Worker[{self.short_id}] Upload File [{res.code}] {res.message}.")
+        logger.info(
+            f"Worker[{self.short_id}] Upload File "
+            f"[{self.target_path}] [{res.code}]{res.message}."
+        )
         self.update(status="uploaded")
 
     def copy_type(self):
@@ -193,9 +196,30 @@ class Worker(BaseModel):
         assert not self.target_path.exists()
         self.update(status="deleted")
 
-    def recheck(self):
+    def recheck_copy(self, retry=5, re_time=2):
         """再次检查当前Worker的结果是否符合预期。"""
-        return True
+        try:
+            return (
+                self.target_path.re_stat(retry=retry, timeout=re_time).size
+                == self.source_path.re_stat().size
+            )
+        except FileNotFoundError:
+            if retry > 0:
+                return self.recheck_copy(retry=retry - 1, re_time=re_time)
+            logger.error(
+                f"Worker[{self.short_id}] Recheck Error: 文件不存在.({retry=})"
+            )
+            return False
+
+    def recheck(self) -> bool:
+        """再次检查当前Worker的结果是否符合预期。"""
+        if self.type == "copy":
+            return self.recheck_copy(retry=3, re_time=3)
+        elif self.type == "delete":
+            self.target_path.re_stat(retry=5, timeout=2)
+            return not self.target_path.exists()
+        else:
+            raise ValueError(f"Unknown Worker Type {self.type}.")
 
     def run(self):
         """启动Worker"""

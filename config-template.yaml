@@ -48,17 +48,23 @@ sync_groups:
     # 一个相对目录，最终为每一个group中的每一个server创建一个备份目录
     backup_dir: "./.alist-sync-backup"  # 默认值: ./.alist-sync-backup
 
+    # 黑名单，支持通配符, 使用 fnmatch.fnmatchcase 函数进行匹配
+    # 详情参考标准库文档 https://docs.python.org/3/library/fnmatch.html
+    # 后面可能会重构，以支持 Linux Glob 模式。
+    # 其路径必须相对与Group中定义的目录，或者使用*开头
+    # 例子：
+    # 忽略 http://localhost:5244/test1/base/ 目录下的所有目录及文件： "base/*"
+    # 忽略所有bfstm文件： "*.bfstm"
+    blacklist:
+      - "*.bfstm"
+      - "base/*"
+      - "testa/b/*"
+
     # 同步目录，一个完整的AList URL，
     # 对于copy, mirror 第一个为源目录，其他个为目标目录
     # Alist服务器信息需要提前在alist_servers中配置
     # 支持在不同的Alist服务器之间同步
     # 例子：http://localhost:5244/test1
-
-    ignore:
-      dir:
-        - .alist-sync
-      match:
-        - "**/*.py"
     group:
       - "http://localhost:5244/test1"
       - "http://localhost:5244/test2"

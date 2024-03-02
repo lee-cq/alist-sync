@@ -6,11 +6,13 @@
 @Date-Time  : 2024/2/25 21:17
 
 """
+import fnmatch
 import logging
 import threading
 import time
 from queue import Queue, Empty
 from typing import Iterator
+from functools import lru_cache
 
 from alist_sdk import AlistPath
 
@@ -18,6 +20,7 @@ from alist_sync.config import create_config, SyncGroup
 from alist_sync.d_worker import Worker
 from alist_sync.thread_pool import MyThreadPoolExecutor
 from alist_sync.common import prefix_in_threads
+
 
 logger = logging.getLogger("alist-sync.d_checker")
 sync_config = create_config()
@@ -36,7 +39,8 @@ class Checker:
             name=f"checker_main[{self.sync_group.name}-{self.__class__.__name__}]",
         )
 
-    def split_path(self, path) -> tuple[AlistPath, str]:
+    @lru_cache(64)
+    def split_path(self, path: AlistPath) -> tuple[AlistPath, str]:
         """将Path切割为sync_dir和相对路径"""
         for sr in self.sync_group.group:
             try:
@@ -51,8 +55,17 @@ class Checker:
     def checker(self, source_path: AlistPath, target_path: AlistPath) -> "Worker|None":
         raise NotImplementedError
 
+    def ignore(self, relative_path) -> bool:
+        for _i in self.sync_group.blacklist:
+            if fnmatch.fnmatchcase(relative_path, _i):
+                logger.debug("Ignore: %s, [matched: %s]", relative_path, _i)
+                return True
+        return False
+
     def checker_every_dir(self, path) -> Iterator[Worker | None]:
         _sync_dir, _relative_path = self.split_path(path)
+        # if self.ignore(_relative_path):
+        #     return
         for _sd in self.sync_group.group:
             _sd: AlistPath
             if _sd == _sync_dir:
@@ -105,7 +118,7 @@ class CheckerCopy(Checker):
         target_path: AlistPath,
     ) -> "Worker|None":
         if not target_path.exists():
-            logger.debug(
+            logger.info(
                 f"Checked: [COPY] {source_path.as_uri()} -> {target_path.as_uri()}"
             )
             return Worker(
