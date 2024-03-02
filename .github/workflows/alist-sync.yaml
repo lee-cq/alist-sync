@@ -1,0 +1,81 @@
+name: Alist Sync
+
+env:
+  _ALIST_SYNC_NAME: "action-${{github.actor}}-${{github.run_id}}-${{github.run_number}}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      reload_storage:
+        description: |
+          是否重新创建存储: true or false
+          默认情况下，如果存储已经存在，则不会重新创建
+          如果指定了true，则会删除全部的存储器，并从新载入
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  run:
+    name: "sync-actions"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python v4
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install alist-sync
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+
+      - name: Load Cache
+        id: alist-data-cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ runner.name }}-alist-sync-data
+          path: |
+            ./.alist-sync-cache/*.db
+            ./.alist-sync-cache/*.json
+            ./alist/data
+
+      - name: Install and Init Alist Server
+        env:
+          _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
+        run: |
+          # init-alist 总是会重置管理员密码为环境变量。
+          bash -ex bootstrap.sh init-alist.sh
+
+
+      - name: Create Storage for Alist if load cache failed
+        if: ${{ github.event.inputs.reload_storage == 'true' }} or ${{ steps.alist-data-cache.outputs.cache-hit != 'true'}}
+        env:
+          _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
+
+          _ALIST_BACKUP: ${{secrets.ALIST_BACKUP}}
+          _ALIST_BACKUP_URL: ${{secrets.ALIST_BACKUP_URL}}
+          _ALIST_BACKUP_USERNAME: ${{secrets.ALIST_BACKUP_USERNAME}}
+          _ALIST_BACKUP_PASSWORD: ${{secrets.ALIST_BACKUP_PASSWORD}}
+
+          _RELOAD_STORAGE: ${{ github.event.inputs.reload_storage }}
+        run: |
+          # 这将会导入全部的内容包括：设置，元数据，用户，存储器。
+          
+          cat > alist-backup-config.json < EOF
+          ${{ secrets.ALIST_BACKUP_CONFIG }}
+          EOF
+          python3 tools/create_storage.py
+
+      - name: RUN
+        env:
+          SYNC_CONFIG: ${{secrets.SYNC_CONFIG}}
+          _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
+        run: |
+          cat > alist-backup-config.json < EOF
+          ${{ secrets.ALIST_BACKUP_CONFIG }}
+          EOF
+          python3 -m alist_sync sync -c $SYNC_CONFIG

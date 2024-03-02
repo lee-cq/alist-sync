@@ -2,12 +2,13 @@ import asyncio
 import builtins
 import hashlib
 import logging
+import os
 import selectors
 import sys
+import threading
 from pathlib import Path
 from typing import Iterable
 
-from alist_sync.config import cache_dir
 
 logger = logging.getLogger("alist-sync.common")
 
@@ -18,8 +19,9 @@ __all__ = [
     "async_all_task_names",
     "is_task_all_success",
     "timeout_input",
-    "clear_cache",
     "clear_path",
+    "all_thread_name",
+    "prefix_in_threads",
 ]
 
 
@@ -39,11 +41,6 @@ def clear_path(path: Path):
         elif i.is_dir():
             clear_path(i)
             i.rmdir()
-
-
-def clear_cache():
-    """清除缓存"""
-    clear_path(cache_dir)
 
 
 def sha1(s) -> str:
@@ -67,6 +64,19 @@ def is_task_all_success(tasks: Iterable | dict) -> bool:
     if isinstance(tasks, dict):
         tasks = tasks.values()
     return all(1 if i.status == "success" else 0 for i in tasks)
+
+
+def all_thread_name() -> set:
+    """返回全部的线程名字"""
+    return {t.name for t in threading.enumerate()}
+
+
+def prefix_in_threads(prefix) -> bool:
+    """在活动的线程，是否存指定的线程名前缀"""
+    for name in all_thread_name():
+        if prefix in name:
+            return True
+    return False
 
 
 def timeout_input(msg, default, timeout=3):

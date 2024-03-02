@@ -1,0 +1,122 @@
+# 如果没有配置MongoDB，文档将会存储至本地缓存
+mongodb_uri: "mongodb+srv://${username}:${password}@${host}/alist_sync?retryWrites=true&w=majority&appName=A1"
+
+# 缓存文件夹
+cache_dir: ./.alist-sync-cache
+
+# 是否以Daemon模式运行
+daemon: false
+
+thread_pool_max_size:
+  workers: 5
+  scanner: 5
+  checker: 5
+
+# Alist 服务器信息 type: list
+alist_servers:
+  - base_url: http://localhost:5244/
+    username: "admin"
+    password: "123456"
+    verify_ssl: false
+
+  - base_url: http://remote_alist_server/
+    username: "admin"
+    password: "admin"
+
+
+sync_groups:
+  - name: "sync1"
+    enable: true  # 默认值: True
+    # 同步类型，一共4种：
+    # 1 copy:如果目标目录中已经存在该文件，则跳过
+    #        忽略存在与目标目录中但不存在于源目录中的文件
+    # 2 mirror: 如果目标目录中已经存在该文件，则跳过
+    #           删除存在于目录目录但不存在于源目录中的文件
+    # 3 sync: 如果目标目录中已经存在该文件，则跳过
+    #         删除存在于目录目录但不存在于源目录中的文件
+    # 4 sync-incr: 基于文件的修改时间，只同步源目录中修改时间晚于目标目录的文件
+    type: "copy"
+
+    # 检查间隔，单位为秒，如果daemon为False，则该值无效
+    interval: 300  # 默认值: 300 秒, 5 分钟
+
+    # 是否需要备份，如果为True，则会在同步之前备份目标目录
+    # 对于copy，该值无效
+    need_backup: false  # 默认值: False
+
+    # 备份目录，当need_backup为True时，该值有效
+    # 一个相对目录，最终为每一个group中的每一个server创建一个备份目录
+    backup_dir: "./.alist-sync-backup"  # 默认值: ./.alist-sync-backup
+
+    # 黑名单，支持通配符, 使用 fnmatch.fnmatchcase 函数进行匹配
+    # 详情参考标准库文档 https://docs.python.org/3/library/fnmatch.html
+    # 后面可能会重构，以支持 Linux Glob 模式。
+    # 其路径必须相对与Group中定义的目录，或者使用*开头
+    # .alist-sync* 将自动添加到黑名单中
+    # 例子：
+    # 忽略 http://localhost:5244/test1/base/ 目录下的所有目录及文件： "base/*"
+    # 忽略所有bfstm文件： "*.bfstm"
+    blacklist:
+      - "*.bfstm"
+      - "base/*"
+      - "testa/b/*"
+
+    # 同步目录，一个完整的AList URL，
+    # 对于copy, mirror 第一个为源目录，其他个为目标目录
+    # Alist服务器信息需要提前在alist_servers中配置
+    # 支持在不同的Alist服务器之间同步
+    # 例子：http://localhost:5244/test1
+    group:
+      - "http://localhost:5244/test1"
+      - "http://localhost:5244/test2"
+
+notify: # 通知服务，当触发一些异常后，将会发送通知。
+  - enable: true
+    type: email
+    smtp_host: ""
+    smtp_port: 25
+    sender: ""
+    password: ""
+    recipients:
+      - ""
+
+  - enable: true
+    type: webhook
+    webhook_url: ""
+    headers:
+      K: V
+
+logs:
+  version: 1
+  disable_existing_loggers: true
+  formatters:
+    simple:
+      format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  handlers:
+    console:
+      class: logging.StreamHandler
+      level: DEBUG
+      formatter: simple
+      stream: ext://sys.stdout
+
+    file:
+      class: logging.handlers.RotatingFileHandler
+      level: DEBUG
+      formatter: simple
+      filename: ./logs/alist-sync.log
+      maxBytes: 10485760  # 10MB
+      backupCount: 5
+      encoding: utf8
+
+  loggers:
+    alist-sync:
+      level: DEBUG
+      handlers:
+        - console
+        - file
+
+    alist-sdk:
+      level: INFO
+      handlers:
+        - console
+        - file

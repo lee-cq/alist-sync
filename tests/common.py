@@ -5,7 +5,9 @@ from typing import NamedTuple
 
 from alist_sdk import Client
 
-from alist_sync.config import cache_dir
+from alist_sync.config import create_config
+
+cache_dir = create_config().cache_dir
 
 
 class StorageInfo(NamedTuple):
@@ -14,6 +16,7 @@ class StorageInfo(NamedTuple):
 
 
 WORKDIR = Path(__file__).parent
+WORKDIR.mkdir(exist_ok=True, parents=True)
 DATA_DIR = StorageInfo("/local", WORKDIR / "alist/test_dir")
 DATA_DIR_DST = StorageInfo("/local_dst", WORKDIR / "alist/test_dir_dst")
 DATA_DIR_DST2 = StorageInfo("/local_dst2", WORKDIR / "alist/test_dir_dst2")
@@ -90,3 +93,8 @@ def setup_function():
     DATA_DIR_DST2.fs_path.mkdir(parents=True, exist_ok=True)
     clear_dir(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
+
+
+if __name__ == "__main__":
+    setup_module()
+    setup_function()

@@ -4,14 +4,16 @@ import logging
 import time
 from typing import Literal
 
-from alist_sdk import AsyncClient as _AsyncClient, Task
+from alist_sdk import AsyncClient as _AsyncClient, Task, Client
 from async_lru import alru_cache as lru_cache
 
 from alist_sync.common import get_alist_client
+from alist_sync.config import create_config
 
 logger = logging.getLogger("alist-sync.client")
+sync_config = create_config()
 
-__all__ = ["AlistClient", "get_status"]
+__all__ = ["AlistClient", "get_status", "create_async_client"]
 
 CopyStatusModify = Literal[
     "init",
@@ -109,6 +111,18 @@ async def get_status(
         return _task_undone[task_name].status, _task_undone[task_name].progress
     else:
         raise ValueError(f"任务不存在: {task_name}")
+
+
+def create_async_client(client: Client) -> AlistClient:
+    """创建AsyncClient"""
+
+    _server = sync_config.get_server(client.base_url)
+    _server.token = client.headers.get("authorization")
+
+    _ac = AlistClient(**_server.dump_for_alist_client())
+    _ac.headers = client.headers
+    _ac.cookies = client.cookies
+    return _ac
 
 
 if __name__ == "__main__":

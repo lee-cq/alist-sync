@@ -5,6 +5,13 @@ __pycache__/
 tests/alist/
 local_test*
 tmp/
+config.json
+config.yaml
+
+.alist-sync-cache/
+alist_sync/.alist-sync-cache/
+alist/
+tools/alist/
 
 # C extensions
 *.so
@@ -161,3 +168,4 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
+alist-backup-config.json

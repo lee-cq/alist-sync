@@ -8,9 +8,9 @@ all_clear() {
     echo "__pycache__"
     find . -type d -name "__pycache__" -exec rm -rf {} \; 2>/dev/null
     echo ".cache"
-    rm -rf alist_sync/.cache alist_sync.egg-info
+    rm -rf alist_sync/.alist-sync-cache alist_sync.egg-info
     echo "alist-test-dir"
-    rm -rf tests/alist/test_* tests/alist/data tests/alist/daemon
+    rm -rf alist/test_* alist/data alist/daemon
 }
 
 case $1 in
@@ -21,7 +21,7 @@ install)
     ;;
 
 alist)
-    cd tests/alist || {
+    cd alist || {
         echo "Error: tests/alist not find "
         exit 1
     }
@@ -31,28 +31,8 @@ alist)
 
 alist-init)
     pkill alist
-    rm -rf tests/alist
-    tests/init_alist.sh
-    ;;
-
-alist-version)
-    cd tests/alist || {
-        echo "未初始化 -  执行 alist-init"
-        exit 2
-    }
-    ./alist version
-    ;;
-
-alist-run)
-    cd tests/alist || {
-        echo "未初始化 -  执行 alist-init"
-        exit 2
-    }
-    ./alist restart
-    ;;
-
-alist-stop)
-    ./tests/alist/alist stop || pkill alist
+    rm -rf alist/*
+    bash tools/init_alist.sh .
     ;;
 
 clear)
@@ -62,10 +42,15 @@ clear)
 test)
     whereis pytest || pip install pytest
     clear
-    ./tests/alist/alist stop || pkill alist
+    ./alist/alist stop || pkill alist
     all_clear
     shift 1
     pytest -v "$@"
+    ;;
+
+main )
+    shift
+    python -m alist_sync $@
     ;;
 
 debugger)
@@ -75,7 +60,7 @@ debugger)
     ;;
 
 *)
-    echo "Usage: $0 {install|alist-init|alist-version|alist-run|alist-stop|clear|debugger|test}"
+    echo "Usage: $0 {install|alist-init|clear|debugger|test}"
     exit 1
     ;;
 esac
