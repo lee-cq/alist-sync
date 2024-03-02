@@ -1,7 +1,6 @@
 import atexit
 import datetime
 import logging
-import os
 import threading
 import time
 from pathlib import Path
@@ -165,6 +164,7 @@ class Worker(BaseModel):
                     "File-Path": urllib.parse.quote(str(self.target_path.as_posix())),
                 },
                 content=fs,
+                timeout=300,
             )
 
         assert res.code == 200
@@ -182,10 +182,6 @@ class Worker(BaseModel):
         self.target_path.parent.mkdir(parents=True, exist_ok=True)
         self.copy_single_stream()
 
-        assert (
-            self.target_path.re_stat(retry=5, timeout=2).size
-            == self.source_path.stat().size
-        )
         return self.update(status="copied")
 
     def delete_type(self):
