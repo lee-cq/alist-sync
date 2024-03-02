@@ -69,12 +69,11 @@ jobs:
 
       - name: RUN
         env:
-          SYNC_CONFIG: ${{secrets.SYNC_CONFIG}}
           _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
         run: |
-          cat > alist-backup-config.json << EOF
-          ${{ secrets.ALIST_BACKUP_CONFIG }}
+          cat > config.yaml << EOF
+          ${{ secrets.SYNC_CONFIG }}
           EOF
           set -ex
           ./bootstrap.sh main test-config
-          ./bootstrap.sh main sync -c alist-backup-config.json
+          ./bootstrap.sh main sync 
