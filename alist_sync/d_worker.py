@@ -84,6 +84,13 @@ class Worker(BaseModel):
         finally:
             pass
 
+    @computed_field()
+    @property
+    def file_size(self) -> int | None:
+        if self.source_path is None:
+            return None
+        return self.source_path.stat().size
+
     @computed_field(return_type=str, alias="_id")
     @property
     def id(self) -> str:

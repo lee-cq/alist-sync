@@ -8,6 +8,7 @@
 """
 import abc
 import datetime
+import json
 import logging
 import shelve
 from pathlib import Path
@@ -89,7 +90,9 @@ class MongoHandle(HandleBase):
         else:
             data = {k: worker.__dict__.get(k) for k in field}
 
-        logger.debug(f"Worker[{worker.id}]: Update: {data}")
+        logger.debug(
+            f"Worker[{worker.id}]: Update: {json.dumps(data, indent=2, ensure_ascii=False)}"
+        )
         return self._workers.update_one(
             {"_id": worker.id},
             {"$set": data},
