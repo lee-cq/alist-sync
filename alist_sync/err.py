@@ -24,6 +24,10 @@ class WorkerError(AlistSyncError):
     pass
 
 
+class RetryError(WorkerError):
+    pass
+
+
 class DownloaderError(WorkerError):
     pass
 

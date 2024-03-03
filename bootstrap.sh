@@ -16,8 +16,8 @@ all_clear() {
 case $1 in
 install)
     pip install -U pip
-    pip install -e .
     pip install git+https://github.com/lee-cq/alist-sdk --no-cache-dir --force-reinstall
+    pip install -e .
     ;;
 
 alist)
@@ -50,7 +50,7 @@ test)
 
 main )
     shift
-    python -m alist_sync $@
+    python -m alist_sync "$@"
     ;;
 
 debugger)
