@@ -3,17 +3,19 @@ import datetime
 import logging
 import threading
 import time
+import traceback
 from pathlib import Path
 from queue import Queue, Empty
-from typing import Literal, Any
+from typing import Literal, Any, Type
 
 from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
-from httpx import Client, Timeout
+from httpx import Client, TimeoutException, Timeout
 from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 
 from alist_sync.config import create_config
 from alist_sync.common import sha1, prefix_in_threads
+from alist_sync.err import WorkerError
 from alist_sync.thread_pool import MyThreadPoolExecutor
 from alist_sync.version import __version__
 
@@ -132,23 +134,51 @@ class Worker(BaseModel):
         self.update(status="back-upped")
         logger.info(f"Worker[{self.short_id}] Backup Success.")
 
+    def __retry(
+        self,
+        retry: int,
+        excepts: tuple[Type[Exception], ...],
+        func,
+        *args,
+        **kwargs,
+    ):
+
+        while retry > 0:
+            try:
+                return func(*args, **kwargs)
+            except excepts as _e:
+                if retry <= 0:
+                    logger.error(
+                        f"Worker[{self.short_id}] Retry Error [{func.__name__}]: "
+                        f"{type(_e)} - {_e}"
+                    )
+                    raise _e
+                logger.warning(
+                    f"Worker[{self.short_id}] {retry = } [{func.__name__}]: "
+                    f"{type(_e)} - {_e}"
+                )
+                retry -= 1
+                continue
+
     def downloader(self):
         """HTTP多线程下载"""
-
-    def copy_single_stream(self):
-        import urllib.parse
-
         # download
-        _tmp = self.tmp_file.open("wb")
-        with downloader_client.stream(
-            "GET",
-            self.source_path.get_download_uri(),
-            follow_redirects=True,
-        ) as _res:
-            for i in _res.iter_bytes(chunk_size=1024 * 1024):
-                _tmp.write(i)
-        _tmp.close()
+        with self.tmp_file.open("wb") as _tmp:
+            with downloader_client.stream(
+                "GET",
+                self.source_path.get_download_uri(),
+                follow_redirects=True,
+            ) as _res:
+                for i in _res.iter_bytes(chunk_size=1024 * 1024):
+                    _tmp.write(i)
+        assert (
+            self.tmp_file.exists()
+            and self.tmp_file.stat().st_size == self.source_path.stat().size
+        ), "下载后文件大小不一致"
         self.update(status="downloaded")
+
+    def uploader(self):
+        import urllib.parse
 
         # upload
         with self.tmp_file.open("rb") as fs:
@@ -180,7 +210,8 @@ class Worker(BaseModel):
 
         self.target_path.unlink(missing_ok=True)
         self.target_path.parent.mkdir(parents=True, exist_ok=True)
-        self.copy_single_stream()
+        self.__retry(3, (TimeoutException, AssertionError), self.downloader)
+        self.__retry(3, (TimeoutException, AssertionError), self.uploader)
 
         return self.update(status="copied")
 
@@ -219,7 +250,7 @@ class Worker(BaseModel):
         """启动Worker"""
         logger.info(f"worker[{self.short_id}] 已经开始工作.")
         self.update()
-        logger.debug(f"Worker[{self.short_id}] Updated to DB.")
+
         try:
             if self.status in ["done", "failed"]:
                 return
@@ -235,11 +266,17 @@ class Worker(BaseModel):
             assert self.recheck()
             self.update(status=f"done")
         except Exception as _e:
-            logger.error(f"worker[{self.short_id}] 出现错误: {_e}")
-            self.error_info = str(_e)
+            logger.error(
+                f"Worker[{self.short_id}] 出现错误:: ({type(_e)}){_e}",
+                exc_info=_e,
+            )
+            self.error_info = (
+                f"Worker[{self.short_id}] 出现错误:: ({type(_e)}){_e}\n"
+                f"{traceback.format_exc()}"
+            )
             self.update(status="failed")
             if sync_config.debug:
-                raise _e
+                raise WorkerError from _e
 
 
 class Workers:

@@ -93,7 +93,7 @@ jobs:
           ${{ secrets.SYNC_CONFIG }}
           EOF
           set -ex
-          export TERM=dumb
+          # export TERM=dumb
           export FORCE_COLOR=true
           export COLUMNS=160
           ./bootstrap.sh main test-config
@@ -101,27 +101,6 @@ jobs:
 
       - name: Debugger
         if: ${{ github.event.inputs.debug == 'true' && failure() }}
-        run: |
-          echo "Debugging"
-          if [ -z "$(sudo netstat -ntlp |grep -v grep |grep :22 |grep sshd)" ]; then
-            echo "sshd is not running."
-            if [ ! -f /lib/systemd/system/ssh.service ]; then
-              echo sshd is not installed. will install ...
-              sudo apt-get update;
-              sudo apt-get install -y openssh-server;
-            fi
-            echo "starting sshd ..."
-            sudo systemctl restart sshd
-          fi
-          git clone https://gist.github.com/lee-cq/ed0f7e2bf9e039f1797c5b700ba118ec
-          mkdir -p ~/.ssh
-          cd ed0f7e2bf9e039f1797c5b700ba118ec || exit 1
-          chmod +x setup.sh && ./setup.sh
-          
-          touch /tmp/keepalive
-          echo 'created keepalive file.'
-          echo 'timeout 21000s(5h 50m).'
-          timeout 21000 bash -c 'stopout=21000; while true;do echo $((stopout=$stopout-3)) > /tmp/stopout ; test -f /tmp/keepalive || break; sleep 3; done ' || echo Timeouted.
-          echo 'The VM will be shutdown in 10 minutes.'
+        uses: csexton/debugger-action@master
 
           
