@@ -127,7 +127,7 @@ class CheckerCopy(Checker):
                 source_path=source_path,
                 target_path=target_path,
             )
-        logger.debug(f"Checked: [JUMP] {source_path.as_uri()}")
+        logger.info(f"Checked: [JUMP] {source_path.as_uri()}")
         return None
 
 

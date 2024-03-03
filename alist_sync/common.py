@@ -97,9 +97,9 @@ def timeout_input(msg, default, timeout=3):
 
 def transfer_speed(size, start: datetime.datetime, end: datetime.datetime) -> str:
     """转换速度"""
-    speed = size * 2 / (end - start).seconds
+    speed = (size * 2) / (end - start).seconds
     if speed < 1024:
-        return f"{speed}B/s"
+        return f"{speed:.2f}B/s"
     speed /= 1024
     if speed < 1024:
         return f"{speed:.2f}KB/s"

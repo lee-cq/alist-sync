@@ -20,7 +20,7 @@ class Webhook:
             "",
             json={
                 "msg_type": "text",
-                "content": {"text":data},
+                "content": {"text": data},
             },
         )
 
