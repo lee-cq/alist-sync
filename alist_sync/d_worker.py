@@ -9,7 +9,7 @@ from typing import Literal, Any
 
 from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
-from httpx import Client
+from httpx import Client, Timeout
 from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 
 from alist_sync.config import create_config
@@ -164,7 +164,7 @@ class Worker(BaseModel):
                     "File-Path": urllib.parse.quote(str(self.target_path.as_posix())),
                 },
                 content=fs,
-                timeout=300,
+                timeout=Timeout(300, read=300, write=300, connect=300),
             )
 
         assert res.code == 200

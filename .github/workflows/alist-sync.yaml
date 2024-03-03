@@ -49,13 +49,14 @@ jobs:
         env:
           _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
         run: |
+          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
           bash -ex bootstrap.sh install
           # init-alist 总是会重置管理员密码为环境变量。
           bash -x bootstrap.sh alist-init
 
 
       - name: Create Storage for Alist if load cache failed
-        if: ${{ github.event.inputs.reload_storage == 'true' }} or ${{ steps.alist-data-cache.outputs.cache-hit != 'true'}}
+        if: github.event.inputs.reload_storage == 'true'  ||  steps.alist-data-cache.outputs.cache-hit != 'true'
         env:
           _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
 
@@ -73,6 +74,19 @@ jobs:
           EOF
           python3 tools/create_storage.py
 
+      - name: Create Tunnel for Cloudflare
+        run: |
+          test ! -n "${{secrets.CLOUDFLARE_TUNNEL_TOKEN}}" && {
+            echo "CLOUDFLARE_TUNNEL_TOKEN is not set. Skip Cloudflare Tunnel Installation."
+            exit 0
+          }
+          echo "Installing Cloudflare Tunnel ..."
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && 
+          sudo dpkg -i cloudflared.deb && 
+          sudo cloudflared service install ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+          echo "CLOUDFLARE_INSTALLED=true" >> "$GITHUB_ENV"
+          echo "Cloudflare Tunnel Installed."
+
       - name: RUN Alist Sync
         run: |
           cat > config.yaml << EOF
@@ -84,3 +98,30 @@ jobs:
           export COLUMNS=160
           ./bootstrap.sh main test-config
           ./bootstrap.sh main sync 
+
+      - name: Debugger
+        if: ${{ github.event.inputs.debug == 'true' && failure() }}
+        run: |
+          echo "Debugging"
+          if [ -z "$(sudo netstat -ntlp |grep -v grep |grep :22 |grep sshd)" ]; then
+            echo "sshd is not running."
+            if [ ! -f /lib/systemd/system/ssh.service ]; then
+              echo sshd is not installed. will install ...
+              sudo apt-get update;
+              sudo apt-get install -y openssh-server;
+            fi
+            echo "starting sshd ..."
+            sudo systemctl restart sshd
+          fi
+          git clone https://gist.github.com/lee-cq/ed0f7e2bf9e039f1797c5b700ba118ec
+          mkdir -p ~/.ssh
+          cd ed0f7e2bf9e039f1797c5b700ba118ec || exit 1
+          chmod +x setup.sh && ./setup.sh
+          
+          touch /tmp/keepalive
+          echo 'created keepalive file.'
+          echo 'timeout 21000s(5h 50m).'
+          timeout 21000 bash -c 'stopout=21000; while true;do echo $((stopout=$stopout-3)) > /tmp/stopout ; test -f /tmp/keepalive || break; sleep 3; done ' || echo Timeouted.
+          echo 'The VM will be shutdown in 10 minutes.'
+
+          
