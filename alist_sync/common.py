@@ -1,5 +1,6 @@
 import asyncio
 import builtins
+import datetime
 import hashlib
 import logging
 import os
@@ -92,6 +93,21 @@ def timeout_input(msg, default, timeout=3):
     else:
         sys.stdout.write("\n")
         return default
+
+
+def transfer_speed(size, start: datetime.datetime, end: datetime.datetime) -> str:
+    """转换速度"""
+    speed = size * 2 / (end - start).seconds
+    if speed < 1024:
+        return f"{speed}B/s"
+    speed /= 1024
+    if speed < 1024:
+        return f"{speed:.2f}KB/s"
+    speed /= 1024
+    if speed < 1024:
+        return f"{speed:.2f}MB/s"
+    speed /= 1024
+    return f"{speed:.2f}GB/s"
 
 
 if __name__ == "__main__":

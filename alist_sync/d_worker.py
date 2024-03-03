@@ -14,7 +14,7 @@ from httpx import Client, TimeoutException, Timeout
 from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 
 from alist_sync.config import create_config
-from alist_sync.common import sha1, prefix_in_threads
+from alist_sync.common import sha1, prefix_in_threads, transfer_speed
 from alist_sync.err import WorkerError, RetryError
 from alist_sync.thread_pool import MyThreadPoolExecutor
 from alist_sync.version import __version__
@@ -116,6 +116,13 @@ class Worker(BaseModel):
             logger.info(f"Worker[{self.short_id}] is {self.status}.")
             self.done_at = datetime.datetime.now()
             sync_config.handle.create_log(self)
+            if self.status == "done":
+                logger.info(
+                    f"Worker[{self.short_id}] "
+                    f"{self.source_path} -> {self.target_path} "
+                    f"平均传输速度: "
+                    f"{transfer_speed(self.file_size, self.done_at, self.created_at)}"
+                )
             return sync_config.handle.delete_worker(self.id)
 
         return sync_config.handle.update_worker(self, *field.keys())

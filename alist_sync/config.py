@@ -249,9 +249,5 @@ class Config(BaseModel):
 
 
 if __name__ == "__main__":
-    # config = create_config()
-    # print(config)
-    # print(config.cache_dir)
-    # print(config.mongodb)
-    # print(config.notify)
+
     print(Config.model_json_schema())
