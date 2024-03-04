@@ -67,6 +67,7 @@ jobs:
 
           _RELOAD_STORAGE: ${{ github.event.inputs.reload_storage }}
         run: |
+          echo RUNNER = ${_ALIST_SYNC_NAME}
           # 这将会导入全部的内容包括：设置，元数据，用户，存储器。
           echo $(pwd)
           cat > alist-backup-config.json << EOF
@@ -76,6 +77,8 @@ jobs:
 
       - name: Create Tunnel for Cloudflare
         run: |
+          echo RUNNER = ${_ALIST_SYNC_NAME}
+
           test ! -n "${{secrets.CLOUDFLARE_TUNNEL_TOKEN}}" && {
             echo "CLOUDFLARE_TUNNEL_TOKEN is not set. Skip Cloudflare Tunnel Installation."
             exit 0
@@ -89,6 +92,7 @@ jobs:
 
       - name: RUN Alist Sync
         run: |
+          echo RUNNER = ${_ALIST_SYNC_NAME}
           cat > config.yaml << EOF
           ${{ secrets.SYNC_CONFIG }}
           EOF

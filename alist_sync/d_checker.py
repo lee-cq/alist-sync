@@ -34,6 +34,12 @@ class SyncRawItem(BaseModel):
     def exists(self):
         return self.stat is not None
 
+    def is_file(self):
+        return not self.stat.is_dir
+
+    def is_dir(self):
+        return self.stat.is_dir
+
 
 class Checker:
     def __init__(self, sync_group: SyncGroup, scaner_queue: Queue, worker_queue: Queue):
@@ -116,7 +122,8 @@ class Checker:
 
             try:
                 _started = True
-                self._t_checker(self.scaner_queue.get(timeout=3))
+                path = self.scaner_queue.get(timeout=3)
+                self.pool.submit(self._t_checker, path)
             except Empty:
                 if _started:
                     continue

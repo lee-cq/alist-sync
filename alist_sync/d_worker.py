@@ -1,4 +1,3 @@
-
 import atexit
 import datetime
 import logging
@@ -70,12 +69,15 @@ class Worker(BaseModel):
         "excludes": {
             "workers",
             "collection",
+            "tmp_file"
         },
     }
 
     def __init__(self, **data: Any):
         super().__init__(**data)
-        logger.info(f"Worker[{self.short_id}] Created: {self.__repr__()}")
+        logger.info(
+            f"Worker[{self.short_id}] Created: " f"{self.model_dump_json(indent=2)}"
+        )
 
     def __repr__(self):
         return f"<Worker {self.type}: {self.source_path} -> {self.target_path}>"
@@ -102,6 +104,7 @@ class Worker(BaseModel):
     def short_id(self) -> str:
         return self.id[:8]
 
+    @computed_field()
     @property
     def tmp_file(self) -> Path:
         return sync_config.cache_dir.joinpath(f"download_tmp_{sha1(self.source_path)}")
@@ -162,7 +165,6 @@ class Worker(BaseModel):
         *args,
         **kwargs,
     ):
-
         while retry > 0:
             try:
                 return func(*args, **kwargs)
@@ -385,7 +387,7 @@ class Workers:
                 )
                 self.thread_pool.shutdown(wait=True, cancel_futures=False)
                 logger.info(f"循环线程退出 - {threading.current_thread().name}")
-                break
+                return
 
             try:
                 _started = True

@@ -36,7 +36,7 @@ def scaner(url: AlistPath, _queue):
         try:
             for item in _url.iterdir():
                 if item.is_file():
-                    logger.debug(f"find file: {item}")
+                    logger.debug(f"Find File: {item}")
                     _queue.put(item)
                 elif item.is_dir():
                     pool.submit(_scaner, item, _s_num)
