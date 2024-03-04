@@ -92,8 +92,7 @@ class Checker:
 
     def checker_every_dir(self, path) -> Iterator[Worker | None]:
         _sync_dir, _relative_path = self.split_path(path)
-        # if self.ignore(_relative_path):
-        #     return
+        logger.debug(f"Checking [{_relative_path}] in {self.sync_group.group}")
         for _sd in self.sync_group.group:
             _sd: AlistPath
             if _sd == _sync_dir:
@@ -102,9 +101,12 @@ class Checker:
             yield self.checker(self.get_stat(path), self.get_stat(target_path))
 
     def _t_checker(self, path):
-        for _c in self.checker_every_dir(path):
-            if _c:
-                self.worker_queue.put(_c)
+        try:
+            for _c in self.checker_every_dir(path):
+                if _c:
+                    self.worker_queue.put(_c)
+        except Exception as _e:
+            logger.error("Checker Error: ", exc_info=_e)
 
     def main(self):
         """"""
