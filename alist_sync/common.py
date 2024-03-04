@@ -3,7 +3,6 @@ import builtins
 import datetime
 import hashlib
 import logging
-import os
 import selectors
 import sys
 import threading
@@ -23,6 +22,7 @@ __all__ = [
     "clear_path",
     "all_thread_name",
     "prefix_in_threads",
+    "transfer_speed",
 ]
 
 
@@ -95,19 +95,23 @@ def timeout_input(msg, default, timeout=3):
         return default
 
 
+def beautify_size(speed: float):
+    if speed < 1024:
+        return f"{speed:.2f}B"
+    speed /= 1024
+    if speed < 1024:
+        return f"{speed:.2f}KB"
+    speed /= 1024
+    if speed < 1024:
+        return f"{speed:.2f}MB"
+    speed /= 1024
+    return f"{speed:.2f}GB"
+
+
 def transfer_speed(size, start: datetime.datetime, end: datetime.datetime) -> str:
     """转换速度"""
     speed = (size * 2) / (end - start).seconds
-    if speed < 1024:
-        return f"{speed:.2f}B/s"
-    speed /= 1024
-    if speed < 1024:
-        return f"{speed:.2f}KB/s"
-    speed /= 1024
-    if speed < 1024:
-        return f"{speed:.2f}MB/s"
-    speed /= 1024
-    return f"{speed:.2f}GB/s"
+    return beautify_size(speed) + '/s'
 
 
 if __name__ == "__main__":

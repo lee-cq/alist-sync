@@ -1,3 +1,4 @@
+
 import atexit
 import datetime
 import logging
@@ -7,6 +8,7 @@ import traceback
 from pathlib import Path
 from queue import Queue, Empty
 from typing import Literal, Any, Type
+from typing_extensions import Unpack
 
 from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
@@ -23,7 +25,7 @@ sync_config = create_config()
 
 WorkerType = ["delete", "copy"]
 # noinspection PyTypeHints
-WorkerTypeModify = Literal[*WorkerType]
+WorkerTypeModify = Literal[Unpack[WorkerType]]
 
 WorkerStatus = [
     "init",
@@ -36,7 +38,7 @@ WorkerStatus = [
     "failed",
 ]
 # noinspection PyTypeHints
-WorkerStatusModify = Literal[*WorkerTypeModify]
+WorkerStatusModify = Literal[Unpack[WorkerTypeModify]]
 
 logger = logging.getLogger("alist-sync.worker")
 
