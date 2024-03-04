@@ -2,6 +2,7 @@
 """
 
 """
+import fnmatch
 import logging
 import threading
 import time
@@ -28,9 +29,33 @@ def login_alist(server: AlistServer):
     logger.info("Login: %s[%s] Success.", _c.base_url, _c.login_username)
 
 
-def scaner(url: AlistPath, _queue):
+def _make_ignore(_sync_group):
+    @lru_cache(64)
+    def split_path(_sync_group, path: AlistPath) -> tuple[AlistPath, str]:
+        """将Path切割为sync_dir和相对路径"""
+        for sr in _sync_group.group:
+            try:
+                return sr, path.relative_to(sr)
+            except ValueError:
+                pass
+        raise ValueError()
+
+    def __ignore(relative_path) -> bool:
+        _, relative_path = split_path(_sync_group, relative_path)
+        for _i in _sync_group.blacklist:
+            if fnmatch.fnmatchcase(relative_path, _i):
+                logger.debug("Ignore: %s, [matched: %s]", relative_path, _i)
+                return True
+        return False
+
+    return __ignore
+
+
+def scaner(url: AlistPath, _queue, i_func: Callable[[str | AlistPath], bool] = None):
     def _scaner(_url: AlistPath, _s_num):
         """ """
+        if i_func is not None and i_func(url):
+            return
         _s_num.append(1)
         logger.debug(f"Scaner: {_url}")
         try:
@@ -71,12 +96,13 @@ def checker(sync_group: SyncGroup, _queue_worker: Queue) -> threading.Thread | N
     _ct = get_checker(sync_group.type)(sync_group, _queue_scaner, _queue_worker).start()
 
     _sign = ["copy"]
+    __ignore = _make_ignore(sync_group)
     if sync_group.type in _sign:
         logger.debug(f"Copy 只需要扫描 {sync_group.group[0].as_uri() = }")
-        scaner(sync_group.group[0], _queue_scaner)
+        scaner(sync_group.group[0], _queue_scaner, __ignore)
     else:
         for uri in sync_group.group:
-            scaner(uri, _queue_scaner)
+            scaner(uri, _queue_scaner, __ignore)
 
     return _ct
 
@@ -94,30 +120,8 @@ def main():
 
 def main_debug():
     """"""
-    import fnmatch
 
     _tw = Workers()
-
-    def _make_ignore(_sync_group):
-        @lru_cache(64)
-        def split_path(_sync_group, path: AlistPath) -> tuple[AlistPath, str]:
-            """将Path切割为sync_dir和相对路径"""
-            for sr in _sync_group.group:
-                try:
-                    return sr, path.relative_to(sr)
-                except ValueError:
-                    pass
-            raise ValueError()
-
-        def __ignore(relative_path) -> bool:
-            _, relative_path = split_path(_sync_group, relative_path)
-            for _i in _sync_group.blacklist:
-                if fnmatch.fnmatchcase(relative_path, _i):
-                    logger.debug("Ignore: %s, [matched: %s]", relative_path, _i)
-                    return True
-            return False
-
-        return __ignore
 
     def iter_file(url, i_func: Callable[[str], bool] | None = None):
         if i_func is not None and i_func(url):
