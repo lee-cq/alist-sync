@@ -2,6 +2,7 @@
 """
 
 """
+import collections
 import fnmatch
 import logging
 import threading
@@ -35,7 +36,10 @@ def _make_ignore(_sync_group):
         """将Path切割为sync_dir和相对路径"""
         for sr in _sync_group.group:
             try:
-                return sr, path.relative_to(sr)
+                re_path = path.relative_to(sr).rstrip("./")
+                if re_path.startswith("./"):
+                    re_path = re_path[2:]
+                return sr, re_path
             except ValueError:
                 pass
         raise ValueError()
@@ -54,7 +58,7 @@ def _make_ignore(_sync_group):
 def scaner(url: AlistPath, _queue, i_func: Callable[[str | AlistPath], bool] = None):
     def _scaner(_url: AlistPath, _s_num):
         """ """
-        if i_func is not None and i_func(url):
+        if i_func is not None and i_func(_url):
             return
         _s_num.append(1)
         logger.debug(f"Scaner: {_url}")
@@ -65,10 +69,9 @@ def scaner(url: AlistPath, _queue, i_func: Callable[[str | AlistPath], bool] = N
                     _queue.put(item)
                 elif item.is_dir():
                     pool.submit(_scaner, item, _s_num)
+            _s_num.pop()
         except alist_sdk.AlistError:
             pass
-        except Exception:
-            _s_num.pop()
 
     assert url.exists(), f"目录不存在{url.as_uri()}"
 
@@ -116,6 +119,51 @@ def main():
         checker(sync_group, _queue_worker)
 
     _tw.join()
+
+
+def main_check():
+    def _checker(_queue_worker: Queue):
+        """检查队列"""
+        while True:
+            try:
+                worker = _queue_worker.get()
+                if worker is None:
+                    break
+                rest[worker.group_name][worker.relative_path] = (
+                    worker.type,
+                    worker.source_path.as_uri().replace(worker.relative_path),
+                    worker.target_path.as_uri().replace(worker.relative_path),
+                    worker.file_size,
+                )
+            except Exception as e:
+                logger.error(e)
+
+    sync_config.daemon = False
+    queue_worker = Queue()
+    rest = collections.defaultdict(dict)
+    _tc = threading.Thread(target=_checker, args=(queue_worker,))
+    _tc.start()
+    for sync_group in sync_config.sync_groups:
+        checker(sync_group, queue_worker)
+    queue_worker.put(None)
+    _tc.join()
+
+    from rich.table import Table
+
+    table = Table(title="Sync Info")
+    table.add_column("Group")
+    table.add_column("Type")
+    table.add_column("Path")
+    table.add_column("Source")
+    table.add_column("Target")
+    table.add_column("Size")
+
+    for group, g_items in rest.items():
+        g_items = sorted(g_items.items(), key=lambda x: x[1][1])
+        for relation_path, values in g_items:
+            # values: type, source, target, size
+            table.add_row(relation_path, *values)
+        table.add_row(end_section=True)
 
 
 def main_debug():

@@ -49,6 +49,7 @@ class Checker:
 
         self.conflict: set = set()
         self.pool = MyThreadPoolExecutor(10)
+        self.stat_sq = threading.Semaphore(3)
         self.main_thread = threading.Thread(
             target=self.main,
             name=f"checker_main[{self.sync_group.name}-{self.__class__.__name__}]",
@@ -67,14 +68,30 @@ class Checker:
     def get_backup_dir(self, path) -> AlistPath:
         return self.split_path(path)[0].joinpath(self.sync_group.backup_dir)
 
+    def create_worker(self, type_: str, source_path: AlistPath, target_path: AlistPath):
+        return Worker(
+            type=type_,
+            group_name=self.sync_group.name,
+            need_backup=self.sync_group.need_backup,
+            backup_dir=self.get_backup_dir(source_path),
+            relative_path=self.split_path(source_path)[1],
+            source_path=source_path,
+            target_path=target_path,
+        )
+
+    _stat_get_times = 0
+
     @lru_cache(40_000)
     def get_stat(self, path: AlistPath) -> SyncRawItem:
-        try:
-            stat = path.re_stat()
-        except FileNotFoundError:
-            stat = None
-
-        return SyncRawItem(path=path, stat=stat)
+        # BUGFIX  控制QPS而不时并发
+        with self.stat_sq:
+            self._stat_get_times += 1
+            logger.debug("get_stat: %s, times: %d", path, self._stat_get_times)
+            try:
+                stat = path.stat()
+            except FileNotFoundError:
+                stat = None
+            return SyncRawItem(path=path, stat=stat)
 
     def checker(
         self,
@@ -150,12 +167,12 @@ class CheckerCopy(Checker):
             logger.info(
                 f"Checked: [COPY] {source_stat.path.as_uri()} -> {target_stat.path.as_uri()}"
             )
-            return Worker(
-                type="copy",
-                need_backup=False,
+            return self.create_worker(
+                type_="copy",
                 source_path=source_stat.path,
                 target_path=target_stat.path,
             )
+
         logger.info(f"Checked: [JUMP] {source_stat.path.as_uri()}")
         return None
 

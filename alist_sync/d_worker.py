@@ -49,12 +49,15 @@ downloader_client = Client(
 # noinspection PyTypeHints
 class Worker(BaseModel):
     owner: str = sync_config.name
+    group_name: str = None
+
     created_at: datetime.datetime = datetime.datetime.now()
     done_at: datetime.datetime | None = None
     type: WorkerTypeModify
     need_backup: bool
     backup_dir: AbsAlistPathType | None = None
 
+    relative_path: str | None = None
     source_path: AbsAlistPathType | None = None
     target_path: AbsAlistPathType  # 永远只操作Target文件，删除也是作为Target
     status: WorkerStatusModify = "init"
@@ -66,11 +69,7 @@ class Worker(BaseModel):
 
     model_config = {
         "arbitrary_types_allowed": True,
-        "excludes": {
-            "workers",
-            "collection",
-            "tmp_file"
-        },
+        "excludes": {"workers", "collection", "tmp_file"},
     }
 
     def __init__(self, **data: Any):
