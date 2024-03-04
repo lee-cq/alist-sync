@@ -99,7 +99,7 @@ class Checker:
             if _sd == _sync_dir:
                 continue
             target_path = _sd.joinpath(_relative_path)
-            yield self.checker(path, target_path)
+            yield self.checker(self.get_stat(path), self.get_stat(target_path))
 
     def _t_checker(self, path):
         for _c in self.checker_every_dir(path):
