@@ -14,7 +14,8 @@ from queue import Queue, Empty
 from typing import Iterator
 from functools import lru_cache
 
-from alist_sdk import AlistPath
+from alist_sdk import AlistPath, RawItem, AlistPathType
+from pydantic import BaseModel
 
 from alist_sync.config import create_config, SyncGroup
 from alist_sync.d_worker import Worker
@@ -24,6 +25,14 @@ from alist_sync.common import prefix_in_threads
 
 logger = logging.getLogger("alist-sync.d_checker")
 sync_config = create_config()
+
+
+class SyncRawItem(BaseModel):
+    path: AlistPathType | None
+    stat: RawItem
+
+    def exists(self):
+        return self.stat is not None
 
 
 class Checker:
@@ -52,7 +61,20 @@ class Checker:
     def get_backup_dir(self, path) -> AlistPath:
         return self.split_path(path)[0].joinpath(self.sync_group.backup_dir)
 
-    def checker(self, source_path: AlistPath, target_path: AlistPath) -> "Worker|None":
+    @lru_cache(40_000)
+    def get_stat(self, path: AlistPath) -> SyncRawItem:
+        try:
+            stat = path.re_stat()
+        except FileNotFoundError:
+            stat = None
+
+        return SyncRawItem(path=path, stat=stat)
+
+    def checker(
+        self,
+        source_stat: SyncRawItem,
+        target_stat: SyncRawItem,
+    ) -> "Worker|None":
         raise NotImplementedError
 
     def ignore(self, relative_path) -> bool:
@@ -113,44 +135,44 @@ class CheckerCopy(Checker):
     """"""
 
     def checker(
-        self,
-        source_path: AlistPath,
-        target_path: AlistPath,
+        self, source_stat: SyncRawItem, target_stat: SyncRawItem
     ) -> "Worker|None":
-        if not target_path.exists():
+        if not target_stat.exists():
             logger.info(
-                f"Checked: [COPY] {source_path.as_uri()} -> {target_path.as_uri()}"
+                f"Checked: [COPY] {source_stat.path.as_uri()} -> {target_stat.path.as_uri()}"
             )
             return Worker(
                 type="copy",
                 need_backup=False,
-                source_path=source_path,
-                target_path=target_path,
+                source_path=source_stat.path,
+                target_path=target_stat.path,
             )
-        logger.info(f"Checked: [JUMP] {source_path.as_uri()}")
+        logger.info(f"Checked: [JUMP] {source_stat.path.as_uri()}")
         return None
 
 
 class CheckerMirror(Checker):
     """"""
 
-    def checker(self, source_path: AlistPath, target_path: AlistPath) -> "Worker|None":
-        _main = self.sync_group.group[0]
-        # target如果是主存储器 - 且target不存在，source存在，删除source
-        if target_path == _main and not target_path.exists() and source_path.exists():
-            return Worker(
-                type="delete",
-                need_backup=self.sync_group.need_backup,
-                backup_dir=self.get_backup_dir(source_path),
-                target_path=source_path,
-            )
-        if not target_path.exists():
-            return Worker(
-                type="copy",
-                need_backup=False,
-                source_path=source_path,
-                target_path=target_path,
-            )
+    def checker(
+        self, source_stat: SyncRawItem, target_stat: SyncRawItem
+    ) -> "Worker|None":
+        # _main = self.sync_group.group[0]
+        # # target如果是主存储器 - 且target不存在，source存在，删除source
+        # if target_stat == _main and not target_stat.exists() and source_stat.exists():
+        #     return Worker(
+        #         type="delete",
+        #         need_backup=self.sync_group.need_backup,
+        #         backup_dir=self.get_backup_dir(source_stat.path),
+        #         target_path=source_stat.path,
+        #     )
+        # if not target_stat.exists():
+        #     return Worker(
+        #         type="copy",
+        #         need_backup=False,
+        #         source_path=source_stat.path,
+        #         target_path=target_stat.path,
+        #     )
         return None
 
 

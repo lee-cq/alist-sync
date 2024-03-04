@@ -1,5 +1,5 @@
 name: Alist Sync
-
+run-name: "action-${{github.actor}}-${{github.run_id}}-${{github.run_number}}"
 on:
   workflow_dispatch:
     inputs:
@@ -17,7 +17,7 @@ on:
         default: false
 
 env:
-  _ALIST_SYNC_NAME: "action-${{github.actor}}-${{github.run_id}}-${{github.run_number}}"
+  _ALIST_SYNC_NAME: "${{github.run-name}}"
   _ALIST_SYNC_DEBUG: ${{ github.event.inputs.debug }}
   _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
 
@@ -102,5 +102,3 @@ jobs:
       - name: Debugger
         if: ${{ github.event.inputs.debug == 'true' && failure() }}
         uses: csexton/debugger-action@master
-
-          

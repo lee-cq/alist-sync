@@ -336,7 +336,7 @@ class Worker(BaseModel):
 class Workers:
     def __init__(self):
         self.thread_pool = MyThreadPoolExecutor(
-            5,
+            20,
             "worker_",
         )
 

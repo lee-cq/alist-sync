@@ -16,7 +16,7 @@ all_clear() {
 case $1 in
 install)
     pip install -U pip
-    pip install git+https://github.com/lee-cq/alist-sdk --no-cache-dir --force-reinstall
+    pip install -U git+https://github.com/lee-cq/alist-sdk --no-cache-dir --force-reinstall
     pip install -e .
     ;;
 
