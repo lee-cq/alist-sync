@@ -21,11 +21,12 @@ from alist_sync.version import __version__
 
 sync_config = create_config()
 
-WorkerType = ["delete", "copy"]
+WorkerType = ("delete", "copy")
+
 # noinspection PyTypeHints,PyCompatibility
 WorkerTypeModify = Literal[*WorkerType]
 
-WorkerStatus = [
+WorkerStatus = (
     "init",
     "deleted",
     "back-upped",
@@ -34,9 +35,9 @@ WorkerStatus = [
     "copied",
     "done",
     "failed",
-]
+)
 # noinspection PyTypeHints,PyCompatibility
-WorkerStatusModify = Literal[*WorkerTypeModify]
+WorkerStatusModify = Literal[*WorkerStatus]
 
 logger = logging.getLogger("alist-sync.worker")
 
@@ -48,12 +49,15 @@ downloader_client = Client(
 # noinspection PyTypeHints
 class Worker(BaseModel):
     owner: str = sync_config.name
+    group_name: str = None
+
     created_at: datetime.datetime = datetime.datetime.now()
     done_at: datetime.datetime | None = None
     type: WorkerTypeModify
     need_backup: bool
     backup_dir: AbsAlistPathType | None = None
 
+    relative_path: str | None = None
     source_path: AbsAlistPathType | None = None
     target_path: AbsAlistPathType  # 永远只操作Target文件，删除也是作为Target
     status: WorkerStatusModify = "init"
@@ -65,24 +69,17 @@ class Worker(BaseModel):
 
     model_config = {
         "arbitrary_types_allowed": True,
-        "excludes": {
-            "workers",
-            "collection",
-        },
+        "excludes": {"workers", "collection", "tmp_file"},
     }
 
     def __init__(self, **data: Any):
         super().__init__(**data)
-        logger.info(f"Worker[{self.short_id}] Created: {self.__repr__()}")
+        logger.info(
+            f"Worker[{self.short_id}] Created: " f"{self.model_dump_json(indent=2)}"
+        )
 
     def __repr__(self):
         return f"<Worker {self.type}: {self.source_path} -> {self.target_path}>"
-
-    def __del__(self):
-        try:
-            self.tmp_file.unlink(missing_ok=True)
-        finally:
-            pass
 
     @computed_field()
     @property
@@ -100,6 +97,7 @@ class Worker(BaseModel):
     def short_id(self) -> str:
         return self.id[:8]
 
+    @computed_field()
     @property
     def tmp_file(self) -> Path:
         return sync_config.cache_dir.joinpath(f"download_tmp_{sha1(self.source_path)}")
@@ -123,6 +121,7 @@ class Worker(BaseModel):
                     f"平均传输速度: "
                     f"{transfer_speed(self.file_size, self.done_at, self.created_at)}"
                 )
+            self.tmp_file.unlink(missing_ok=True)
             return sync_config.handle.delete_worker(self.id)
 
         return sync_config.handle.update_worker(self, *field.keys())
@@ -160,7 +159,6 @@ class Worker(BaseModel):
         *args,
         **kwargs,
     ):
-
         while retry > 0:
             try:
                 return func(*args, **kwargs)
@@ -334,7 +332,7 @@ class Worker(BaseModel):
 class Workers:
     def __init__(self):
         self.thread_pool = MyThreadPoolExecutor(
-            5,
+            20,
             "worker_",
         )
 
@@ -383,7 +381,7 @@ class Workers:
                 )
                 self.thread_pool.shutdown(wait=True, cancel_futures=False)
                 logger.info(f"循环线程退出 - {threading.current_thread().name}")
-                break
+                return
 
             try:
                 _started = True

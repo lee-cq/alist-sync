@@ -16,7 +16,7 @@ all_clear() {
 case $1 in
 install)
     pip install -U pip
-    pip install git+https://github.com/lee-cq/alist-sdk --no-cache-dir --force-reinstall
+    pip install -U git+https://github.com/lee-cq/alist-sdk --no-cache-dir --force-reinstall
     pip install -e .
     ;;
 
@@ -37,6 +37,12 @@ alist-init)
 
 clear)
     all_clear
+    ;;
+
+clear-log )
+    rm -rf logs/*
+    rm -rf alist/data/log/*
+    ./bootstrap.sh alist restart
     ;;
 
 test)

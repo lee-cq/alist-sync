@@ -6,6 +6,7 @@
 @Date-Time  : 2024/2/25 21:17
 
 """
+import datetime
 import fnmatch
 import logging
 import threading
@@ -14,7 +15,8 @@ from queue import Queue, Empty
 from typing import Iterator
 from functools import lru_cache
 
-from alist_sdk import AlistPath
+from alist_sdk import AlistPath, RawItem, AlistPathType, Item
+from pydantic import BaseModel
 
 from alist_sync.config import create_config, SyncGroup
 from alist_sync.d_worker import Worker
@@ -26,6 +28,21 @@ logger = logging.getLogger("alist-sync.d_checker")
 sync_config = create_config()
 
 
+class SyncRawItem(BaseModel):
+    path: AlistPathType | None
+    scan_time: datetime.datetime = datetime.datetime.now()
+    stat: RawItem | Item | None
+
+    def exists(self):
+        return self.stat is not None
+
+    def is_file(self):
+        return not self.stat.is_dir
+
+    def is_dir(self):
+        return self.stat.is_dir
+
+
 class Checker:
     def __init__(self, sync_group: SyncGroup, scaner_queue: Queue, worker_queue: Queue):
         self.sync_group: SyncGroup = sync_group
@@ -34,6 +51,7 @@ class Checker:
 
         self.conflict: set = set()
         self.pool = MyThreadPoolExecutor(10)
+        self.stat_sq = threading.Semaphore(4)
         self.main_thread = threading.Thread(
             target=self.main,
             name=f"checker_main[{self.sync_group.name}-{self.__class__.__name__}]",
@@ -52,7 +70,38 @@ class Checker:
     def get_backup_dir(self, path) -> AlistPath:
         return self.split_path(path)[0].joinpath(self.sync_group.backup_dir)
 
-    def checker(self, source_path: AlistPath, target_path: AlistPath) -> "Worker|None":
+    def create_worker(self, type_: str, source_path: AlistPath, target_path: AlistPath):
+        return Worker(
+            type=type_,
+            group_name=self.sync_group.name,
+            need_backup=self.sync_group.need_backup,
+            backup_dir=self.get_backup_dir(source_path),
+            relative_path=self.split_path(source_path)[1],
+            source_path=source_path,
+            target_path=target_path,
+        )
+
+    _stat_get_times = 0
+
+    @lru_cache(40_000)
+    def get_stat(self, path: AlistPath) -> SyncRawItem:
+        # BUGFIX  控制QPS而不时并发
+        with self.stat_sq:
+            self._stat_get_times += 1
+            logger.debug("get_stat: %s, times: %d", path, self._stat_get_times)
+            try:
+                stat = path.client.dict_files_items(
+                    path.parent.as_posix(), cache_empty=True
+                ).get(path.name)
+            except FileNotFoundError:
+                stat = None
+            return SyncRawItem(path=path, stat=stat)
+
+    def checker(
+        self,
+        source_stat: SyncRawItem,
+        target_stat: SyncRawItem,
+    ) -> "Worker|None":
         raise NotImplementedError
 
     def ignore(self, relative_path) -> bool:
@@ -64,19 +113,21 @@ class Checker:
 
     def checker_every_dir(self, path) -> Iterator[Worker | None]:
         _sync_dir, _relative_path = self.split_path(path)
-        # if self.ignore(_relative_path):
-        #     return
+        logger.debug(f"Checking [{_relative_path}] in {self.sync_group.group}")
         for _sd in self.sync_group.group:
             _sd: AlistPath
             if _sd == _sync_dir:
                 continue
             target_path = _sd.joinpath(_relative_path)
-            yield self.checker(path, target_path)
+            yield self.checker(self.get_stat(path), self.get_stat(target_path))
 
     def _t_checker(self, path):
-        for _c in self.checker_every_dir(path):
-            if _c:
-                self.worker_queue.put(_c)
+        try:
+            for _c in self.checker_every_dir(path):
+                if _c:
+                    self.worker_queue.put(_c)
+        except Exception as _e:
+            logger.error("Checker Error: ", exc_info=_e)
 
     def main(self):
         """"""
@@ -94,8 +145,14 @@ class Checker:
 
             try:
                 _started = True
-                self._t_checker(self.scaner_queue.get(timeout=3))
+                path = self.scaner_queue.get(timeout=3)
+                self.pool.submit(self._t_checker, path)
             except Empty:
+                logger.debug(
+                    "Checker Size: %s, %d",
+                    self.sync_group.name,
+                    self.pool.work_qsize(),
+                )
                 if _started:
                     continue
                 logger.info(
@@ -113,44 +170,44 @@ class CheckerCopy(Checker):
     """"""
 
     def checker(
-        self,
-        source_path: AlistPath,
-        target_path: AlistPath,
+        self, source_stat: SyncRawItem, target_stat: SyncRawItem
     ) -> "Worker|None":
-        if not target_path.exists():
+        if not target_stat.exists():
             logger.info(
-                f"Checked: [COPY] {source_path.as_uri()} -> {target_path.as_uri()}"
+                f"Checked: [COPY] {source_stat.path.as_uri()} -> {target_stat.path.as_uri()}"
             )
-            return Worker(
-                type="copy",
-                need_backup=False,
-                source_path=source_path,
-                target_path=target_path,
+            return self.create_worker(
+                type_="copy",
+                source_path=source_stat.path,
+                target_path=target_stat.path,
             )
-        logger.info(f"Checked: [JUMP] {source_path.as_uri()}")
+
+        logger.info(f"Checked: [JUMP] {source_stat.path.as_uri()}")
         return None
 
 
 class CheckerMirror(Checker):
     """"""
 
-    def checker(self, source_path: AlistPath, target_path: AlistPath) -> "Worker|None":
-        _main = self.sync_group.group[0]
-        # target如果是主存储器 - 且target不存在，source存在，删除source
-        if target_path == _main and not target_path.exists() and source_path.exists():
-            return Worker(
-                type="delete",
-                need_backup=self.sync_group.need_backup,
-                backup_dir=self.get_backup_dir(source_path),
-                target_path=source_path,
-            )
-        if not target_path.exists():
-            return Worker(
-                type="copy",
-                need_backup=False,
-                source_path=source_path,
-                target_path=target_path,
-            )
+    def checker(
+        self, source_stat: SyncRawItem, target_stat: SyncRawItem
+    ) -> "Worker|None":
+        # _main = self.sync_group.group[0]
+        # # target如果是主存储器 - 且target不存在，source存在，删除source
+        # if target_stat == _main and not target_stat.exists() and source_stat.exists():
+        #     return Worker(
+        #         type="delete",
+        #         need_backup=self.sync_group.need_backup,
+        #         backup_dir=self.get_backup_dir(source_stat.path),
+        #         target_path=source_stat.path,
+        #     )
+        # if not target_stat.exists():
+        #     return Worker(
+        #         type="copy",
+        #         need_backup=False,
+        #         source_path=source_stat.path,
+        #         target_path=target_stat.path,
+        #     )
         return None
 
 

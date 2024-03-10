@@ -64,6 +64,21 @@ def sync(
     return main()
 
 
+@app.command("check")
+def check(
+    config_file: str = Option(None, "--config", "-c", help="配置文件路径"),
+):
+    """检查任务"""
+    from alist_sync.config import create_config
+    from alist_sync.d_main import main_check
+
+    if config_file and Path(config_file).exists():
+        os.environ["ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
+        os.environ["_ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
+    create_config()
+    return main_check()
+
+
 @app.command("get-info")
 def cli_get(path: str):
     """"""
