@@ -1,6 +1,7 @@
 import atexit
 import datetime
 import logging
+import sys
 import threading
 import time
 import traceback
@@ -27,14 +28,14 @@ WorkerType = ("delete", "copy")
 WorkerTypeModify = Literal[*WorkerType]
 
 WorkerStatus = (
-    "init",
-    "deleted",
-    "back-upped",
-    "downloaded",
-    "uploaded",
-    "copied",
-    "done",
-    "failed",
+    "init",  # 9
+    "deleted",  # 2
+    "back-upped",  # 8
+    "downloaded",  # 5
+    "uploaded",  # 3
+    "copied",  # 2
+    "done",  # 0
+    "failed",  # 1
 )
 # noinspection PyTypeHints,PyCompatibility
 WorkerStatusModify = Literal[*WorkerStatus]
@@ -42,7 +43,10 @@ WorkerStatusModify = Literal[*WorkerStatus]
 logger = logging.getLogger("alist-sync.worker")
 
 downloader_client = Client(
-    headers={"User-Agent": sync_config.ua or f"alist-sync/{__version__}"}
+    headers={
+        "User-Agent": sync_config.ua
+        or f"alist-sync/{__version__}/ Python {'.'.join(sys.version_info[:3])}"
+    },
 )
 
 

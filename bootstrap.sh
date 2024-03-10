@@ -2,6 +2,12 @@
 
 cd "$(dirname "$0")" || exit 1
 
+if [ -f ".env" ]; then
+    set -a
+    . .env
+    set +a
+fi
+
 all_clear() {
     echo ".pytest_cache"
     find . -type d -name ".pytest_cache" -exec rm -rf {} \; 2>/dev/null
@@ -14,6 +20,14 @@ all_clear() {
 }
 
 case $1 in
+
+init-env)
+
+    ./bootstrap.sh install
+    ./bootstrap.sh alist-init
+    ./bootstrap.sh alist restart
+    ;;
+
 install)
     pip install -U pip
     pip install -U git+https://github.com/lee-cq/alist-sdk --no-cache-dir --force-reinstall
