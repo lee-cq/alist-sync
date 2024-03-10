@@ -13,6 +13,7 @@ config.yaml
 alist_sync/.alist-sync-cache/
 alist/
 tools/alist/
+logs/
 
 # C extensions
 *.so

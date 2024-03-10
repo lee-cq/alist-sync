@@ -7,7 +7,6 @@ import traceback
 from pathlib import Path
 from queue import Queue, Empty
 from typing import Literal, Any, Type
-from typing_extensions import Unpack
 
 from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
@@ -22,11 +21,11 @@ from alist_sync.version import __version__
 
 sync_config = create_config()
 
-WorkerType = ["delete", "copy"]
-# noinspection PyTypeHints
-WorkerTypeModify = Literal[Unpack[WorkerType]]
+WorkerType = ("delete", "copy")
+# noinspection PyTypeHints,PyCompatibility
+WorkerTypeModify = Literal[*WorkerType]
 
-WorkerStatus = [
+WorkerStatus = (
     "init",
     "deleted",
     "back-upped",
@@ -35,9 +34,10 @@ WorkerStatus = [
     "copied",
     "done",
     "failed",
-]
-# noinspection PyTypeHints
-WorkerStatusModify = Literal[Unpack[WorkerTypeModify]]
+)
+
+# noinspection PyTypeHints,PyCompatibility
+WorkerStatusModify = Literal[*WorkerStatus]
 
 logger = logging.getLogger("alist-sync.worker")
 
@@ -81,12 +81,6 @@ class Worker(BaseModel):
     def __repr__(self):
         return f"<Worker {self.type}: {self.source_path} -> {self.target_path}>"
 
-    def __del__(self):
-        try:
-            self.tmp_file.unlink(missing_ok=True)
-        finally:
-            pass
-
     @computed_field()
     @property
     def file_size(self) -> int | None:
@@ -127,6 +121,7 @@ class Worker(BaseModel):
                     f"平均传输速度: "
                     f"{transfer_speed(self.file_size, self.done_at, self.created_at)}"
                 )
+            self.tmp_file.unlink(missing_ok=True)
             return sync_config.handle.delete_worker(self.id)
 
         return sync_config.handle.update_worker(self, *field.keys())

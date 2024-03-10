@@ -95,17 +95,17 @@ def timeout_input(msg, default, timeout=3):
         return default
 
 
-def beautify_size(speed: float):
-    if speed < 1024:
-        return f"{speed:.2f}B"
-    speed /= 1024
-    if speed < 1024:
-        return f"{speed:.2f}KB"
-    speed /= 1024
-    if speed < 1024:
-        return f"{speed:.2f}MB"
-    speed /= 1024
-    return f"{speed:.2f}GB"
+def beautify_size(byte_size: float):
+    if byte_size < 1024:
+        return f"{byte_size:.2f}B"
+    byte_size /= 1024
+    if byte_size < 1024:
+        return f"{byte_size:.2f}KB"
+    byte_size /= 1024
+    if byte_size < 1024:
+        return f"{byte_size:.2f}MB"
+    byte_size /= 1024
+    return f"{byte_size:.2f}GB"
 
 
 def transfer_speed(size, start: datetime.datetime, end: datetime.datetime) -> str:

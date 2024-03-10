@@ -6,6 +6,7 @@
 @Date-Time  : 2024/2/25 21:17
 
 """
+import datetime
 import fnmatch
 import logging
 import threading
@@ -14,7 +15,7 @@ from queue import Queue, Empty
 from typing import Iterator
 from functools import lru_cache
 
-from alist_sdk import AlistPath, RawItem, AlistPathType
+from alist_sdk import AlistPath, RawItem, AlistPathType, Item
 from pydantic import BaseModel
 
 from alist_sync.config import create_config, SyncGroup
@@ -29,7 +30,8 @@ sync_config = create_config()
 
 class SyncRawItem(BaseModel):
     path: AlistPathType | None
-    stat: RawItem
+    scan_time: datetime.datetime = datetime.datetime.now()
+    stat: RawItem | Item | None
 
     def exists(self):
         return self.stat is not None
@@ -49,7 +51,7 @@ class Checker:
 
         self.conflict: set = set()
         self.pool = MyThreadPoolExecutor(10)
-        self.stat_sq = threading.Semaphore(3)
+        self.stat_sq = threading.Semaphore(4)
         self.main_thread = threading.Thread(
             target=self.main,
             name=f"checker_main[{self.sync_group.name}-{self.__class__.__name__}]",
@@ -88,7 +90,9 @@ class Checker:
             self._stat_get_times += 1
             logger.debug("get_stat: %s, times: %d", path, self._stat_get_times)
             try:
-                stat = path.stat()
+                stat = path.client.dict_files_items(
+                    path.parent.as_posix(), cache_empty=True
+                ).get(path.name)
             except FileNotFoundError:
                 stat = None
             return SyncRawItem(path=path, stat=stat)
@@ -144,6 +148,11 @@ class Checker:
                 path = self.scaner_queue.get(timeout=3)
                 self.pool.submit(self._t_checker, path)
             except Empty:
+                logger.debug(
+                    "Checker Size: %s, %d",
+                    self.sync_group.name,
+                    self.pool.work_qsize(),
+                )
                 if _started:
                     continue
                 logger.info(

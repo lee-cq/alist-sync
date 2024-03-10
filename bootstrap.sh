@@ -39,6 +39,12 @@ clear)
     all_clear
     ;;
 
+clear-log )
+    rm -rf logs/*
+    rm -rf alist/data/log/*
+    ./bootstrap.sh alist restart
+    ;;
+
 test)
     whereis pytest || pip install pytest
     clear

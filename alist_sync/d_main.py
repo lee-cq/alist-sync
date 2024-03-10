@@ -18,6 +18,7 @@ from alist_sdk import AlistPath, login_server
 from alist_sync.d_worker import Workers
 from alist_sync.thread_pool import MyThreadPoolExecutor
 from alist_sync.config import SyncGroup, create_config, AlistServer
+from alist_sync.common import beautify_size, all_thread_name
 from alist_sync.d_checker import get_checker
 
 sync_config = create_config()
@@ -60,26 +61,36 @@ def scaner(url: AlistPath, _queue, i_func: Callable[[str | AlistPath], bool] = N
         """ """
         if i_func is not None and i_func(_url):
             return
-        _s_num.append(1)
         logger.debug(f"Scaner: {_url}")
         try:
+            _s_num.append(1)
             for item in _url.iterdir():
                 if item.is_file():
                     logger.debug(f"Find File: {item}")
                     _queue.put(item)
                 elif item.is_dir():
                     pool.submit(_scaner, item, _s_num)
-            _s_num.pop()
         except alist_sdk.AlistError:
             pass
+        except Exception as _e:
+            logger.error("Scaner Error: %s", _e, exc_info=_e)
+        finally:
+            _s_num.pop()
 
     assert url.exists(), f"目录不存在{url.as_uri()}"
 
     s_sum = []
     with MyThreadPoolExecutor(5, thread_name_prefix=f"scaner_{url.as_uri()}") as pool:
         pool.submit(_scaner, url, s_sum)
+        time.sleep(5)
         while s_sum:
             time.sleep(2)
+            logger.debug(
+                "Scaner Size: %s, %d, Threads[%s]",
+                url,
+                len(s_sum),
+                all_thread_name(),
+            )
 
 
 def checker(sync_group: SyncGroup, _queue_worker: Queue) -> threading.Thread | None:
@@ -124,6 +135,7 @@ def main():
 def main_check():
     def _checker(_queue_worker: Queue):
         """检查队列"""
+        total_size = 0
         while True:
             try:
                 worker = _queue_worker.get()
@@ -131,12 +143,13 @@ def main_check():
                     break
                 rest[worker.group_name][worker.relative_path] = (
                     worker.type,
-                    worker.source_path.as_uri().replace(worker.relative_path),
-                    worker.target_path.as_uri().replace(worker.relative_path),
-                    worker.file_size,
+                    worker.source_path.as_uri().replace(worker.relative_path, ""),
+                    worker.target_path.as_uri().replace(worker.relative_path, ""),
+                    beautify_size(worker.file_size),
                 )
+                total_size += worker.file_size
             except Exception as e:
-                logger.error(e)
+                logger.error(f"Main Checker Error: {e}", exc_info=e)
 
     sync_config.daemon = False
     queue_worker = Queue()
@@ -144,10 +157,12 @@ def main_check():
     _tc = threading.Thread(target=_checker, args=(queue_worker,))
     _tc.start()
     for sync_group in sync_config.sync_groups:
-        checker(sync_group, queue_worker)
+        cc = checker(sync_group, queue_worker)
+        cc.join()
     queue_worker.put(None)
     _tc.join()
 
+    from rich.console import Console
     from rich.table import Table
 
     table = Table(title="Sync Info")
@@ -158,12 +173,19 @@ def main_check():
     table.add_column("Target")
     table.add_column("Size")
 
+    logger.info("Creating Table...")
     for group, g_items in rest.items():
         g_items = sorted(g_items.items(), key=lambda x: x[1][1])
         for relation_path, values in g_items:
             # values: type, source, target, size
             table.add_row(relation_path, *values)
         table.add_row(end_section=True)
+
+    console = Console(record=True, width=180)
+    time.sleep(2)
+    console.print(table)
+    console.save_html("sync_info.html", clear=False)
+    console.save_svg("sync_info.svg")
 
 
 def main_debug():
