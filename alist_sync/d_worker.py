@@ -22,6 +22,7 @@ from alist_sync.version import __version__
 sync_config = create_config()
 
 WorkerType = ("delete", "copy")
+
 # noinspection PyTypeHints,PyCompatibility
 WorkerTypeModify = Literal[*WorkerType]
 
@@ -35,7 +36,6 @@ WorkerStatus = (
     "done",
     "failed",
 )
-
 # noinspection PyTypeHints,PyCompatibility
 WorkerStatusModify = Literal[*WorkerStatus]
 
