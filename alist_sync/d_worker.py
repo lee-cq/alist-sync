@@ -27,18 +27,18 @@ WorkerType = ("delete", "copy")
 # noinspection PyTypeHints,PyCompatibility
 WorkerTypeModify = Literal[*WorkerType]
 
-WorkerStatus = (
-    "init",  # 9
-    "deleted",  # 2
-    "back-upped",  # 8
-    "downloaded",  # 5
-    "uploaded",  # 3
-    "copied",  # 2
-    "done",  # 0
-    "failed",  # 1
-)
+WorkerStatus = {
+    "init": 9,  # 9
+    "deleted": 2,  # 2
+    "back-upped": 8,  # 8
+    "downloaded": 5,  # 5
+    "uploaded": 3,  # 3
+    "copied": 2,  # 2
+    "done": 0,  # 0
+    "failed": 1,  # 1
+}
 # noinspection PyTypeHints,PyCompatibility
-WorkerStatusModify = Literal[*WorkerStatus]
+WorkerStatusModify = Literal[*WorkerStatus.keys()]
 
 logger = logging.getLogger("alist-sync.worker")
 
@@ -84,6 +84,10 @@ class Worker(BaseModel):
 
     def __repr__(self):
         return f"<Worker {self.type}: {self.source_path} -> {self.target_path}>"
+
+    @property
+    def priority(self) -> int:
+        return WorkerStatus[self.status]
 
     @computed_field()
     @property
@@ -264,9 +268,7 @@ class Worker(BaseModel):
         except FileNotFoundError:
             if retry > 0:
                 return self.recheck_copy(retry=retry - 1, re_time=re_time)
-            logger.error(
-                f"Worker[{self.short_id}] Recheck Error: 文件不存在.({retry=})"
-            )
+            logger.error(f"Worker[{self.short_id}] Recheck Error: 文件不存在.({retry=})")
             return False
 
     def recheck(self) -> bool:
@@ -380,9 +382,7 @@ class Workers:
                 and not prefix_in_threads("checker_")
                 and time.time() - sync_config.start_time > sync_config.timeout
             ):
-                logger.info(
-                    f"等待Worker执行完成, 排队中的数量: {self.thread_pool.work_qsize()}"
-                )
+                logger.info(f"等待Worker执行完成, 排队中的数量: {self.thread_pool.work_qsize()}")
                 self.thread_pool.shutdown(wait=True, cancel_futures=False)
                 logger.info(f"循环线程退出 - {threading.current_thread().name}")
                 return
