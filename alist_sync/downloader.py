@@ -7,7 +7,7 @@
 
 下载器使用一个单独线程启动，它创建一个事件循环并在其内部保持同步。
 """
-
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,8 +17,17 @@ if TYPE_CHECKING:
     ...
 
 
-def find_aria2_bin():
+def find_aria2_bin(default=None):
     """"""
+    paths = os.getenv("PATH").split(";" if os.name == "nt" else ":")
+    for p in paths:
+        p = Path(p)
+        for i in p.glob("aria2c*"):
+            if i.is_file():
+                return i.resolve()
+    if default:
+        return default
+    raise FileNotFoundError()
 
 
 def make_aria2_cmd(
@@ -28,7 +37,7 @@ def make_aria2_cmd(
     aria2_bin: str | Path = None,
 ):
     """aria2命令构造器"""
-    aria2_bin = aria2_bin or "../tmp/aria2c"
+    aria2_bin = aria2_bin or find_aria2_bin(default="../tmp/aria2c")
     headers = {k.lowwer(): v for k, v in headers.items()} if headers else {}
     headers.setdefault("ua", "")  # TODO
 
@@ -51,7 +60,9 @@ def make_aria2_rpc(local: Path, remote: AlistPath | str, headers, *args, **kwarg
 
 
 def start_aria2c_daemon():
-    """"""
+    """
+    https://www.jianshu.com/p/3c1b65907fb7
+    """
 
 
 async def aria2c(cmd: list):

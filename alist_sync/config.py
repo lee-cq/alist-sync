@@ -31,8 +31,13 @@ PAlistPathType = Annotated[
     ),
 ]
 
-TrueValues = {"true", "1", "yes", "on", "y", "t", "1"}
-FalseValues = {"false", "0", "no", "off", "n", "f", "0"}
+TrueValues = {"true", "1", "yes", "on", "y", "t"}
+FalseValues = {"false", "0", "no", "off", "n", "f"}
+
+B = 1
+KB = B * 1024
+MB = KB * 1024
+GB = MB * 1024
 
 
 def getenv(name, default=None):
@@ -98,8 +103,8 @@ class SyncGroup(BaseModel):
     interval: int = 300
     need_backup: bool = False
     backup_dir: str = ".alist-sync-backup"
-    blacklist: Annotated[list[str], BeforeValidator(lambda x: set_add(x))] = []
-    whitelist: Annotated[list[str], BeforeValidator(lambda x: set_add(x))] = []
+    blacklist: Annotated[set[str], BeforeValidator(lambda x: x + [".alist-sync*"])] = {}
+    whitelist: Annotated[set[str], BeforeValidator(lambda x: x)] = {}
     group: list[PAlistPathType] = Field(min_length=2)
 
 
@@ -245,9 +250,5 @@ class Config(BaseModel):
         )
 
 
-# sync_config = create_config()
-
-
 if __name__ == "__main__":
-
     print(Config.model_json_schema())

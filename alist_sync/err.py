@@ -24,6 +24,10 @@ class WorkerError(AlistSyncError):
     pass
 
 
+class StatusError(AlistSyncError):
+    """状态异常"""
+
+
 class RetryError(WorkerError):
     pass
 
