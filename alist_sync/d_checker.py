@@ -123,9 +123,9 @@ class Checker:
 
     def _t_checker(self, path):
         try:
-            for _c in self.checker_every_dir(path):
-                if _c:
-                    self.worker_queue.put(_c)
+            for _w in self.checker_every_dir(path):
+                if _w:
+                    self.worker_queue.put(_w)
         except Exception as _e:
             logger.error("Checker Error: ", exc_info=_e)
 

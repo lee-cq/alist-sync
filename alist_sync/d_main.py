@@ -132,6 +132,25 @@ def main():
     _tw.join()
 
 
+def main_new():
+    from alist_sync.a_worker import Workers
+
+    class _Q:
+
+        def put(self, item):
+            awks.add_worker(item)
+
+    _queue_worker = _Q()
+    awks = Workers()
+    _tws = threading.Thread(target=awks.mian, name="Workers")
+    _tws.start()
+    logger.debug("Workers Start.")
+    for sync_group in sync_config.sync_groups:
+        checker(sync_group, _queue_worker)
+
+    _tws.join()
+
+
 def main_check():
     def _checker(_queue_worker: Queue):
         """检查队列"""
@@ -167,8 +186,8 @@ def main_check():
 
     table = Table(title="Sync Info")
     table.add_column("Group")
-    table.add_column("Type")
     table.add_column("Path")
+    table.add_column("Type")
     table.add_column("Source")
     table.add_column("Target")
     table.add_column("Size")
@@ -178,7 +197,7 @@ def main_check():
         g_items = sorted(g_items.items(), key=lambda x: x[1][1])
         for relation_path, values in g_items:
             # values: type, source, target, size
-            table.add_row(relation_path, *values)
+            table.add_row(group, relation_path, *values)
         table.add_row(end_section=True)
 
     console = Console(record=True, width=180)

@@ -45,7 +45,7 @@ logger = logging.getLogger("alist-sync.worker")
 downloader_client = Client(
     headers={
         "User-Agent": sync_config.ua
-        or f"alist-sync/{__version__}/ Python {'.'.join(sys.version_info[:3])}"
+        or f"alist-sync/{__version__}/ Python {sys.version}"
     },
 )
 
@@ -78,12 +78,15 @@ class Worker(BaseModel):
 
     def __init__(self, **data: Any):
         super().__init__(**data)
-        logger.info(
-            f"Worker[{self.short_id}] Created: " f"{self.model_dump_json(indent=2)}"
-        )
+        # logger.info(
+        #     f"Worker[{self.short_id}] Created: " f"{self.model_dump_json(indent=2)}"
+        # )
 
     def __repr__(self):
         return f"<Worker {self.type}: {self.source_path} -> {self.target_path}>"
+
+    def __lt__(self, other):
+        return self.priority < other.priority
 
     @property
     def priority(self) -> int:
@@ -268,7 +271,9 @@ class Worker(BaseModel):
         except FileNotFoundError:
             if retry > 0:
                 return self.recheck_copy(retry=retry - 1, re_time=re_time)
-            logger.error(f"Worker[{self.short_id}] Recheck Error: 文件不存在.({retry=})")
+            logger.error(
+                f"Worker[{self.short_id}] Recheck Error: 文件不存在.({retry=})"
+            )
             return False
 
     def recheck(self) -> bool:
@@ -382,7 +387,9 @@ class Workers:
                 and not prefix_in_threads("checker_")
                 and time.time() - sync_config.start_time > sync_config.timeout
             ):
-                logger.info(f"等待Worker执行完成, 排队中的数量: {self.thread_pool.work_qsize()}")
+                logger.info(
+                    f"等待Worker执行完成, 排队中的数量: {self.thread_pool.work_qsize()}"
+                )
                 self.thread_pool.shutdown(wait=True, cancel_futures=False)
                 logger.info(f"循环线程退出 - {threading.current_thread().name}")
                 return

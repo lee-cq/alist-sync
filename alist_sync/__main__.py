@@ -50,7 +50,7 @@ def sync(
 ):
     """同步任务"""
     from alist_sync.config import create_config, getenv
-    from alist_sync.d_main import main, main_debug
+    from alist_sync.d_main import main, main_debug, main_new
 
     if config_file and Path(config_file).exists():
         os.environ["ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
@@ -61,7 +61,8 @@ def sync(
     if debug:
         echo("调试模式启动")
         return main_debug()
-    return main()
+    logger.info("Begin Sync.")
+    return main_new()
 
 
 @app.command("check")
