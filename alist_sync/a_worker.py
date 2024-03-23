@@ -4,89 +4,48 @@
 
 import asyncio
 import logging
+import time
 import urllib.parse
-from pathlib import Path
-from typing import Literal, Callable
+from functools import lru_cache
+from typing import Callable
 
-from alist_sdk import AlistPath, AlistPathType
 from httpx import Timeout
-from pydantic import BaseModel
 
 from alist_sync.d_worker import Worker
 from alist_sync.downloader import make_aria2_cmd, aria2c
+from alist_sync.common import async_all_task_names, GB
+from alist_sync.temp_files import TempFiles
 from alist_sync.err import *
-
-B = 1
-KB = B * 1024
-MB = KB * 1024
-GB = MB * 1024
 
 
 logger = logging.getLogger("alist-sync.a_worker")
 
 
-class TempFile(BaseModel):
-    local_path: Path
-    remote_path: AlistPathType
-    status: Literal["init", "downloading", "downloaded", "failed", "removed"] = "init"
-    refer_times: int = 1
+LCU_UPLOAD_UNDONE: dict[str, callable] = {}  # URL, LCU缓存对象
+LCU_UPLOAD_DONE: dict[str, callable] = {}  # URL, LCU缓存对象
 
 
-class TempFiles(BaseModel):
-    pre_size: int = 0
-    tmp_files: dict[Path, TempFile] = {}
+def cached_upload(client, task_type: str = "undone", timeout: int = None) -> dict:
+    if task_type not in ["undone", "done"]:
+        raise ValueError(f"task_type 参数错误: {task_type}")
 
-    def __del__(self):
-        for fp in self.tmp_files.keys():
-            fp.unlink(missing_ok=True)
+    lcu_dict = LCU_UPLOAD_UNDONE if task_type == "undone" else LCU_UPLOAD_DONE
+    if timeout is None:
+        timeout = 1 if task_type == "undone" else 5
 
-    def add_tmp(self, path: Path, remote_file: str | AlistPath):
-        if path in self.tmp_files:
-            self.tmp_files[path].refer_times += 1
-        self.tmp_files[path] = TempFile(
-            local_path=path,
-            remote_path=remote_file,
-        )
+    def maker_client_cache() -> callable:
+        @lru_cache(maxsize=1)
+        def _client_cache(_tmp_time: int) -> dict:
+            _call = client.task_undone if task_type == "undone" else client.task_done
+            res = _call("upload")
+            if res.code != 200:
+                raise RecheckError(f"获取上传任务失败: {res.code}: {res.message}")
+            return {task.id: task for task in res.data}
 
-    def done_tmp(self, path: Path):
-        assert path in self.tmp_files, f"没有找到path: {path}"
-        self.tmp_files[path].refer_times -= 1
-        # if self.tmp_files[path] <= 0:
-        #     self.clear_file(path)
+        lcu_dict[client.base_url] = _client_cache
+        return _client_cache
 
-    def clear_file(self, path: Path):
-        path.unlink()
-        del self.tmp_files[path]
-
-    def pre_total_size(self):
-        return sum(_.remote_path.stat().size for _ in self.tmp_files.values())
-
-    def total_size(self):
-        return sum(fp.stat().st_size for fp in self.tmp_files.keys() if fp.exists())
-
-    def status(self) -> tuple[int, int, int, str]:
-        """
-        :return 总大小，总文件数，总引用数，message
-        """
-        _total_size = self.total_size()
-        _files = len(self.tmp_files)
-        _uses = sum(_.refer_times for _ in self.tmp_files.values())
-        return (
-            _total_size,
-            _files,
-            _uses,
-            f"当前缓存了{_files} 个文件，占用空间{_total_size}, 被{_uses} Worker引用。",
-        )
-
-    def auto_clear(self):
-        if self.total_size() < 10 * GB:
-            return
-        [
-            self.clear_file(path)
-            for path, t in self.tmp_files.items()
-            if t.refer_times <= 0
-        ]
-        return self.auto_clear()
+    return lcu_dict.get(client.base_url, maker_client_cache())(time.time() // timeout)
 
 
 # noinspection PyMethodMayBeStatic
@@ -167,8 +126,13 @@ class Workers:
                 logger.error("上传失败: %d: %s", res.code, res.message)
                 raise UploadError(f"{res.code}: {res.message}")
 
-            logger.info("上传成功: %s", worker.target_path.as_uri())
-            worker.update(status="copied")
+            assert res.data.task.id, "Task ID 不存在"
+            logger.info(
+                "上传成功[Task ID: %s]: %s",
+                res.data.task.id,
+                worker.target_path.as_uri(),
+            )
+            worker.update(status="copied", upload_id=res.data.task.id)
 
         logger.info("开始上传: %s", worker.target_path.as_uri())
         await asyncio.to_thread(_upload)
@@ -194,6 +158,12 @@ class Workers:
 
         def _recheck():
             if worker.type == "copy":
+                assert worker.upload_id, "Upload ID 不存在"
+                if worker.upload_id in cached_upload(
+                    worker.target_path.client, "undone"
+                ):
+                    logger.debug("正在上传到后端存储: %s", worker.upload_id)
+                    return
                 if worker.source_path.stat().size == worker.target_path.re_stat().size:
                     worker.update(status="done")
                 else:
@@ -211,7 +181,9 @@ class Workers:
 
                 except FileNotFoundError:
                     worker.update(status="done")
-            raise
+
+            else:
+                raise ValueError(f"Worker 类型异常: {worker.type}")
 
         logger.info("开始重新检查: %s", worker.model_dump_json(indent=2))
         await asyncio.to_thread(_recheck)
@@ -251,7 +223,14 @@ class Workers:
         """"""
         async with self.sp_workers:
             try:
-                await self.action_selector(worker)(worker)
+                _action = self.action_selector(worker)
+                worker_name = f"worker_{_action.__name__}_{worker.id}"
+                asyncio.current_task().set_name(worker_name)
+                logger.info("Awaiting Worker: %s", worker_name)
+                await _action(worker)
+            except Exception as e:
+                logger.error("Worker Error: %s", e, exc_info=e)
+                # worker.update(status="failed", error_info=str(e))
             finally:
                 if worker.status not in ["done", "failed"]:
                     await self.worker_queue.put((worker.priority, worker))
@@ -266,11 +245,19 @@ class Workers:
                 logger.debug("Worker Queue Size: %d", self.worker_queue.qsize())
 
                 # noinspection PyAsyncCall
-                asyncio.create_task(self._event(worker))
+                asyncio.create_task(
+                    self._event(worker), name=f"worker_None_{worker.id}"
+                )
             except asyncio.QueueEmpty:
-                logger.debug("Worker Queue is Empty. ")
+                workers_name: set = {
+                    i for i in async_all_task_names() if i.startswith("worker_")
+                }
+
+                logger.debug(
+                    f"Worker Queue is Empty. Tasks {len(workers_name)}",
+                )
                 await asyncio.sleep(1)
-                # TODO
+                # TODO 优雅退出
 
     def mian(self):
         asyncio.run(self.a_main())

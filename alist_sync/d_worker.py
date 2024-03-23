@@ -70,6 +70,7 @@ class Worker(BaseModel):
     # 私有属性
     workers: "Workers | None" = Field(None, exclude=True)
     collection: Collection | None = Field(None, exclude=True)
+    upload_id: str | None = Field(None, exclude=True)
 
     model_config = {
         "arbitrary_types_allowed": True,

@@ -23,7 +23,17 @@ __all__ = [
     "all_thread_name",
     "prefix_in_threads",
     "transfer_speed",
+    "beautify_size",
+    "B",
+    "KB",
+    "MB",
+    "GB",
 ]
+
+B = 1
+KB = B * 1024
+MB = KB * 1024
+GB = MB * 1024
 
 
 # noinspection PyUnresolvedReferences
@@ -111,7 +121,7 @@ def beautify_size(byte_size: float):
 def transfer_speed(size, start: datetime.datetime, end: datetime.datetime) -> str:
     """转换速度"""
     speed = (size * 2) / (end - start).seconds
-    return beautify_size(speed) + '/s'
+    return beautify_size(speed) + "/s"
 
 
 if __name__ == "__main__":
