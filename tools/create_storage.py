@@ -8,7 +8,10 @@
 import datetime
 import json
 import os
+import time
 from pathlib import Path
+
+import httpx
 
 from alist_sdk import Storage
 from alist_sdk.tools.client import ExtraClient
@@ -18,7 +21,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 alist_config = json.loads(PROJECT_ROOT.joinpath("alist/data/config.json").read_text())
 
 alist_port = alist_config["scheme"]["http_port"]
-admin_password = os.getenv("_ALIST_ADMIN_PASSWORD", ) or "123456"
+admin_password = os.getenv("_ALIST_ADMIN_PASSWORD", "123456")
 
 remote_url = os.getenv("_ALIST_BACKUP_URL")
 remote_username = os.getenv("_ALIST_BACKUP_USERNAME")
@@ -70,18 +73,30 @@ res = local_client.admin_storage_create(
         }
     )
 )
-print(res)
+print("创建本地存储状态", res)
 
 
-if remote_url:
-    local_client.import_config_from_other_client(
-        base_url=remote_url,
-        username=remote_username,
-        password=remote_password,
-        verify=False,
-    )
-    exit(0)
+def create_storage(retry=3):
+    try:
+        if remote_url:
+            local_client.import_config_from_other_client(
+                base_url=remote_url,
+                username=remote_username,
+                password=remote_password,
+                verify=False,
+            )
+            exit(0)
 
-_bk_file = PROJECT_ROOT.joinpath("alist-backup-config.json")
-if _bk_file.exists():
-    local_client.import_configs(json.loads(_bk_file.read_text()))
+        _bk_file = PROJECT_ROOT.joinpath("alist-backup-config.json")
+        if _bk_file.exists():
+            local_client.import_configs(json.loads(_bk_file.read_text()))
+    except httpx.ReadTimeout as _e:
+        if retry <= 0:
+            raise _e
+
+        print(f"超时 {retry = }")
+        time.sleep(3)
+        create_storage(retry=retry - 1)
+
+
+create_storage()

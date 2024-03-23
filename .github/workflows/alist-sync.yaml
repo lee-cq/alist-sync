@@ -51,20 +51,15 @@ jobs:
             ./alist/data
 
       - name: Install and Init Alist Server
-        env:
-          _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
         run: |
           sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
           bash -ex bootstrap.sh install
           # init-alist 总是会重置管理员密码为环境变量。
           bash -x bootstrap.sh alist-init
 
-
       - name: Create Storage for Alist if load cache failed
         if: github.event.inputs.reload_storage == 'true'  ||  steps.alist-data-cache.outputs.cache-hit != 'true'
         env:
-          _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
-
           _ALIST_BACKUP: ${{secrets.ALIST_BACKUP}}
           _ALIST_BACKUP_URL: ${{secrets.ALIST_BACKUP_URL}}
           _ALIST_BACKUP_USERNAME: ${{secrets.ALIST_BACKUP_USERNAME}}
