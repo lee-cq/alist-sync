@@ -122,21 +122,20 @@ def beautify_size(byte_size: float) -> str:
 
 def data_size_to_bytes(data_size: str) -> int:
     """数据大小转换为字节"""
-    data_size = data_size.strip()
+    if isinstance(data_size, int):
+        return data_size
+    if not isinstance(data_size, str):
+        raise ValueError("Invalid data size format")
     if data_size == "-1":
         return -1
-    units = {
-        "B": 1,
-        "KB": 1024,
-        "MB": 1024**2,
-        "GB": 1024**3,
-    }
+    data_size = data_size.strip()
+    units = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3}
     match = re.match(r"^(\d+(\.\d+)?)\s*([a-zA-Z]+)$", data_size)
     if not match:
         raise ValueError("Invalid data size format")
     # 提取数值和单位
     size_number = float(match.group(1))
-    unit = match.group(2).upper()
+    unit = match.group(3).upper()
     unit = unit if unit else "B"
     unit = unit if unit.endswith("B") else unit + "B"
     # 检查单位是否有效
