@@ -13,7 +13,7 @@ from httpx import Timeout
 
 from alist_sync.d_worker import Worker
 from alist_sync.downloader import make_aria2_cmd, aria2c
-from alist_sync.common import async_all_task_names, GB, prefix_in_threads
+from alist_sync.common import async_all_task_names as tasks_name, GB, prefix_in_threads
 from alist_sync.temp_files import TempFiles
 from alist_sync.err import *
 
@@ -250,20 +250,18 @@ class Workers:
                     self._event(worker), name=f"worker_None_{worker.id}"
                 )
             except asyncio.QueueEmpty:
-                workers_name: set = {
-                    i for i in async_all_task_names() if i.startswith("worker_")
-                }
-
-                logger.debug(f"Worker Queue is Empty. Tasks {len(workers_name)}")
-                await asyncio.sleep(1)
-                # 退出
+                # workers = {i for i in tasks_name() if i.startswith("worker_")}
                 if (
-                    len(workers_name) == 0
+                    len({i for i in tasks_name() if i.startswith("worker_")}) == 0
                     and self.worker_queue.empty() is True
                     and not prefix_in_threads("prefix_in_threads")
                 ):
                     logger.info("Workers Main Finished.")
                     break
+                await asyncio.sleep(1)
+
+                # workers = {i for i in tasks_name() if i.startswith("worker_")}
+                # logger.debug(f"Worker Queue is Empty. Tasks {len(workers)}")
 
     def mian(self):
         asyncio.run(self.a_main())

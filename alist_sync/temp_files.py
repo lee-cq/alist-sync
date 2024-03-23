@@ -12,10 +12,7 @@ from typing import Literal
 from alist_sdk import AlistPathType, AlistPath
 from pydantic import BaseModel
 
-B = 1
-KB = B * 1024
-MB = KB * 1024
-GB = MB * 1024
+from alist_sync.common import GB
 
 
 class TempFile(BaseModel):
@@ -32,6 +29,7 @@ class TempFiles(BaseModel):
     def __del__(self):
         for fp in self.tmp_files.keys():
             fp.unlink(missing_ok=True)
+            fp.with_name(fp.name + ".log").unlink(missing_ok=True)
 
     def add_tmp(self, path: Path, remote_file: str | AlistPath):
         if path in self.tmp_files:

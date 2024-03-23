@@ -9,9 +9,14 @@ on:
         required: false
         default: false
 
-
       debug:
         description: 开启调试模式
+        type: boolean
+        required: false
+        default: false
+
+      check_only:
+        description: 仅检查同步动作，不执行具体操作
         type: boolean
         required: false
         default: false
@@ -91,6 +96,8 @@ jobs:
           echo "Cloudflare Tunnel Installed."
 
       - name: RUN Alist Sync
+        env:
+          CHECK_ONLY: ${{ github.event.inputs.check_only }}
         run: |
           echo RUNNER = ${_ALIST_SYNC_NAME}
           cat > config.yaml << EOF
@@ -101,7 +108,13 @@ jobs:
           export FORCE_COLOR=true
           export COLUMNS=160
           ./bootstrap.sh main test-config
-          ./bootstrap.sh main sync 
+          if [ "${CHECK_ONLY}" == "true" ]; then
+            echo "Check Only"
+            ./bootstrap.sh main check
+          else
+            echo "Sync"
+            ./bootstrap.sh main sync
+          fi
 
       - name: Debugger
         if: ${{ github.event.inputs.debug == 'true' && failure() }}
