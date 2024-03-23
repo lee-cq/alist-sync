@@ -54,7 +54,7 @@ class Workers:
         self.worker_queue = asyncio.PriorityQueue()
         self.tmp_files: TempFiles = TempFiles()
 
-        self.sp_workers = asyncio.Semaphore(5)
+        self.sp_workers = asyncio.Semaphore(11)
         self.sp_downloader = asyncio.Semaphore(5)
         self.sp_uploader = asyncio.Semaphore(5)
 
@@ -77,22 +77,24 @@ class Workers:
         if self.tmp_files.pre_total_size() > 15 * GB:
             await asyncio.sleep(5)
             return
-
-        self.tmp_files.add_tmp(worker.tmp_file, worker.source_path)
-        logger.info("开始下载: %s", worker.source_path.as_uri())
-        rt_code = await aria2c(
-            make_aria2_cmd(
-                remote=worker.source_path,
-                local=worker.tmp_file,
+        async with self.sp_downloader:
+            self.tmp_files.add_tmp(worker.tmp_file, worker.source_path)
+            logger.info("开始下载: %s", worker.source_path.as_uri())
+            rt_code = await aria2c(
+                make_aria2_cmd(
+                    remote=worker.source_path,
+                    local=worker.tmp_file,
+                )
             )
-        )
 
-        if rt_code != 0:
-            worker.update(status="failed", error_info=f"下载失败, 返回码: {rt_code}")
-            self.tmp_files.clear_file(worker.tmp_file)
-            logger.error("下载失败, 返回码: %d", rt_code)
-            raise DownloaderError(f"下载失败, 返回码: {rt_code}")
-        worker.update(status="downloaded")
+            if rt_code != 0:
+                worker.update(
+                    status="failed", error_info=f"下载失败, 返回码: {rt_code}"
+                )
+                self.tmp_files.clear_file(worker.tmp_file)
+                logger.error("下载失败, 返回码: %d", rt_code)
+                raise DownloaderError(f"下载失败, 返回码: {rt_code}")
+            worker.update(status="downloaded")
 
     async def uploader(self, worker: Worker):
         """"""
@@ -134,8 +136,9 @@ class Workers:
             )
             worker.update(status="copied", upload_id=res.data.task.id)
 
-        logger.info("开始上传: %s", worker.target_path.as_uri())
-        await asyncio.to_thread(_upload)
+        async with self.sp_uploader:
+            logger.info("开始上传: %s", worker.target_path.as_uri())
+            await asyncio.to_thread(_upload)
 
     async def deleter(self, worker: Worker):
         """"""
@@ -243,7 +246,7 @@ class Workers:
         while True:
             try:
                 _p, worker = self.worker_queue.get_nowait()
-                logger.debug("Worker Queue Size: %d", self.worker_queue.qsize())
+                logger.info("Worker Queue Size: %d", self.worker_queue.qsize())
 
                 # noinspection PyAsyncCall
                 asyncio.create_task(
