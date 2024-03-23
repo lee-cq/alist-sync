@@ -25,6 +25,7 @@ __all__ = [
     "prefix_in_threads",
     "transfer_speed",
     "beautify_size",
+    "data_size_to_bytes",
     "B",
     "KB",
     "MB",

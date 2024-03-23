@@ -138,14 +138,14 @@ class Config(BaseModel):
 
     _id: str = getenv("ALIST_SYNC_NAME", "alist-sync")
 
-    _cache_dir: Path = Field(
+    t_cache_dir: Path = Field(
         default=getenv(
             "ALIST_SYNC_CACHE_DIR",
             Path(__file__).parent / ".alist-sync-cache",
         ),
         alias="cache_dir",
     )
-    _cache_max_size: Annotated[int, BeforeValidator(data_size_to_bytes)] = Field(
+    t_cache_max_size: Annotated[int, BeforeValidator(data_size_to_bytes)] = Field(
         getenv("ALIST_SYNC_CACHE_MAX_SIZE", "0"),
         alias="cache_max_size",
     )
@@ -184,17 +184,17 @@ class Config(BaseModel):
 
     @cached_property
     def cache_dir(self) -> Path:
-        self._cache_dir.mkdir(exist_ok=True, parents=True)
-        return self._cache_dir
+        self.t_cache_dir.mkdir(exist_ok=True, parents=True)
+        return self.t_cache_dir
 
     @cached_property
     def cache_max_size(self) -> int:
-        if self._cache_max_size > 0:
-            return int(self._cache_max_size)
+        if self.t_cache_max_size > 0:
+            return int(self.t_cache_max_size)
 
         import psutil
 
-        if self._cache_max_size == 0:
+        if self.t_cache_max_size == 0:
             return psutil.disk_usage(self.cache_dir.__str__()).free // 2
         else:
             return psutil.disk_usage(self.cache_dir.__str__()).free
