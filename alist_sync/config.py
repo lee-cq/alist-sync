@@ -13,6 +13,8 @@ from httpx import URL
 from pydantic import Field, BaseModel, BeforeValidator
 from pymongo.database import Database
 
+from alist_sync.common import data_size_to_bytes
+
 
 if TYPE_CHECKING:
     from alist_sync.data_handle import ShelveHandle, MongoHandle
@@ -136,12 +138,16 @@ class Config(BaseModel):
 
     _id: str = getenv("ALIST_SYNC_NAME", "alist-sync")
 
-    cache__dir: Path = Field(
+    _cache_dir: Path = Field(
         default=getenv(
             "ALIST_SYNC_CACHE_DIR",
             Path(__file__).parent / ".alist-sync-cache",
         ),
         alias="cache_dir",
+    )
+    _cache_max_size: Annotated[int, BeforeValidator(data_size_to_bytes)] = Field(
+        getenv("ALIST_SYNC_CACHE_MAX_SIZE", "0"),
+        alias="cache_max_size",
     )
 
     timeout: int = Field(10)
@@ -178,8 +184,20 @@ class Config(BaseModel):
 
     @cached_property
     def cache_dir(self) -> Path:
-        self.cache__dir.mkdir(exist_ok=True, parents=True)
-        return self.cache__dir
+        self._cache_dir.mkdir(exist_ok=True, parents=True)
+        return self._cache_dir
+
+    @cached_property
+    def cache_max_size(self) -> int:
+        if self._cache_max_size > 0:
+            return int(self._cache_max_size)
+
+        import psutil
+
+        if self._cache_max_size == 0:
+            return psutil.disk_usage(self.cache_dir.__str__()).free // 2
+        else:
+            return psutil.disk_usage(self.cache_dir.__str__()).free
 
     @lru_cache(10)
     def get_server(self, base_url) -> AlistServer:

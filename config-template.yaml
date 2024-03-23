@@ -3,6 +3,9 @@ mongodb_uri: "mongodb+srv://${username}:${password}@${host}/alist_sync?retryWrit
 
 # 缓存文件夹
 cache_dir: ./.alist-sync-cache
+# cache_max_size: 最大使用的缓存大小，单位为字节.
+# 默认值: cache_dir 所在磁盘的剩余空间的 1/2, -1表示整个磁盘（不限制）， 0表示使用1/2磁盘空间
+cache_max_size: 0
 
 # 是否以Daemon模式运行
 daemon: false

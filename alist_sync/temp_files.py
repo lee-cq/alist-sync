@@ -6,13 +6,17 @@
 @Date-Time  : 2024/3/23 14:02
 
 """
+import time
 from pathlib import Path
 from typing import Literal
+
 
 from alist_sdk import AlistPathType, AlistPath
 from pydantic import BaseModel
 
-from alist_sync.common import GB
+from alist_sync.config import create_config
+
+SYNC_CONFIG = create_config()
 
 
 class TempFile(BaseModel):
@@ -25,6 +29,7 @@ class TempFile(BaseModel):
 class TempFiles(BaseModel):
     pre_size: int = 0
     tmp_files: dict[Path, TempFile] = {}
+    max_size: int = SYNC_CONFIG.cache_max_size
 
     def __del__(self):
         for fp in self.tmp_files.keys():
@@ -40,19 +45,23 @@ class TempFiles(BaseModel):
         )
 
     def done_tmp(self, path: Path):
+        """使用完成"""
         assert path in self.tmp_files, f"没有找到path: {path}"
         self.tmp_files[path].refer_times -= 1
         # if self.tmp_files[path] <= 0:
         #     self.clear_file(path)
 
     def clear_file(self, path: Path):
+        """清理文件"""
         path.unlink()
         del self.tmp_files[path]
 
     def pre_total_size(self):
+        """预计总大小"""
         return sum(_.remote_path.stat().size for _ in self.tmp_files.values())
 
     def total_size(self):
+        """实际总大小"""
         return sum(fp.stat().st_size for fp in self.tmp_files.keys() if fp.exists())
 
     def status(self) -> tuple[int, int, int, str]:
@@ -70,11 +79,10 @@ class TempFiles(BaseModel):
         )
 
     def auto_clear(self):
-        if self.total_size() < 10 * GB:
-            return
-        [
-            self.clear_file(path)
-            for path, t in self.tmp_files.items()
-            if t.refer_times <= 0
-        ]
-        return self.auto_clear()
+        while self.total_size() > self.max_size:
+            [
+                self.clear_file(path)
+                for path, t in self.tmp_files.items()
+                if t.refer_times <= 0
+            ]
+        time.sleep(1)

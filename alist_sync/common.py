@@ -3,6 +3,7 @@ import builtins
 import datetime
 import hashlib
 import logging
+import re
 import selectors
 import sys
 import threading
@@ -105,7 +106,7 @@ def timeout_input(msg, default, timeout=3):
         return default
 
 
-def beautify_size(byte_size: float):
+def beautify_size(byte_size: float) -> str:
     if byte_size < 1024:
         return f"{byte_size:.2f}B"
     byte_size /= 1024
@@ -116,6 +117,32 @@ def beautify_size(byte_size: float):
         return f"{byte_size:.2f}MB"
     byte_size /= 1024
     return f"{byte_size:.2f}GB"
+
+
+def data_size_to_bytes(data_size: str) -> int:
+    """数据大小转换为字节"""
+    data_size = data_size.strip()
+    if data_size == "-1":
+        return -1
+    units = {
+        "B": 1,
+        "KB": 1024,
+        "MB": 1024**2,
+        "GB": 1024**3,
+    }
+    match = re.match(r"^(\d+(\.\d+)?)\s*([a-zA-Z]+)$", data_size)
+    if not match:
+        raise ValueError("Invalid data size format")
+    # 提取数值和单位
+    size_number = float(match.group(1))
+    unit = match.group(2).upper()
+    unit = unit if unit else "B"
+    unit = unit if unit.endswith("B") else unit + "B"
+    # 检查单位是否有效
+    if unit not in units:
+        raise ValueError(f"Invalid unit: {unit}")
+    # 计算字节数并返回
+    return int(size_number * units[unit])
 
 
 def transfer_speed(size, start: datetime.datetime, end: datetime.datetime) -> str:
