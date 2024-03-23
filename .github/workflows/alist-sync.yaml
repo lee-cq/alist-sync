@@ -105,6 +105,7 @@ jobs:
           EOF
           set -ex
           # export TERM=dumb
+            sudo mkdir -m 777 -p /mnt/.alist-sync-cache
           export FORCE_COLOR=true
           export COLUMNS=160
           ./bootstrap.sh main test-config
