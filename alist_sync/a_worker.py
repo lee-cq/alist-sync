@@ -257,7 +257,7 @@ class Workers:
                 if (
                     len({i for i in tasks_name() if i.startswith("worker_")}) == 0
                     and self.worker_queue.empty() is True
-                    and not prefix_in_threads("prefix_in_threads")
+                    and not prefix_in_threads("checker_main")
                 ):
                     logger.info("Workers Main Finished.")
                     break
