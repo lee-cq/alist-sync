@@ -58,10 +58,13 @@ jobs:
           ${{ secrets.GRAFANA_AGENT_CONFIG }}
           EOF
           
-          if grep -q "<your-instance-name>" grafana-agent.yaml; then
+          if ! grep -q "<your-instance-name>" grafana-agent.yaml; then
             echo "GRAFANA_AGENT_CONFIG is not set. Skip Grafana Agent Installation."
             exit 0
           fi
+          
+          mkdir -p logs
+          echo test-log > logs/grafana-test.log
           
           sed -i "s/<your-instance-name>/${_ALIST_SYNC_NAME}/g" grafana-agent.yaml
           sed -i "s#<your-log-path>#$(pwd)/logs/*.log#g" grafana-agent.yaml
@@ -71,8 +74,8 @@ jobs:
           sudo dpkg -i "grafana-agent-0.39.1-1.amd64.deb"
           
           sudo cp -f grafana-agent.yaml /etc/grafana-agent.yaml
-          sudo systemctl enable grafana-agent.service
           sudo systemctl start grafana-agent.service
+          sudo journalctl -u grafana-agent.service --no-pager
           
           rm -f grafana-agent.yaml grafana-agent-0.39.1-1.amd64.deb
 
