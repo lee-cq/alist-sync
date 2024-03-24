@@ -13,7 +13,7 @@ from httpx import Timeout
 
 from alist_sync.d_worker import Worker
 from alist_sync.downloader import make_aria2_cmd, aria2c
-from alist_sync.common import async_all_task_names as tasks_name, GB, prefix_in_threads
+from alist_sync.common import async_all_task_names as tasks_name, prefix_in_threads
 from alist_sync.temp_files import TempFiles
 from alist_sync.err import *
 
@@ -113,7 +113,7 @@ class Workers:
                     "PUT",
                     "/api/fs/put",
                     headers={
-                        "As-Task": "true",
+                        "As-Task": "false",
                         "Content-Type": "application/octet-stream",
                         "Last-Modified": str(
                             int(worker.source_path.stat().modified.timestamp() * 1000)

@@ -58,12 +58,12 @@ jobs:
           ${{ secrets.GRAFANA_AGENT_CONFIG }}
           EOF
           
-          if grep -q "instance: <your-instance-name>" grafana-agent.yaml; then
+          if grep -q "<your-instance-name>" grafana-agent.yaml; then
             echo "GRAFANA_AGENT_CONFIG is not set. Skip Grafana Agent Installation."
             exit 0
           fi
           
-          sed -i "s/instance: <your-instance-name>/instance: ${_ALIST_SYNC_NAME}/g" grafana-agent.yaml
+          sed -i "s/<your-instance-name>/${_ALIST_SYNC_NAME}/g" grafana-agent.yaml
           sed -i "s#<your-log-path>#$(pwd)/logs/*.log#g" grafana-agent.yaml
                     
           curl -fL# https://github.com/grafana/agent/releases/download/v0.39.1/grafana-agent-0.39.1-1.amd64.deb -o grafana-agent-0.39.1-1.amd64.deb
