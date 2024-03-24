@@ -174,7 +174,7 @@ class CheckerCopy(Checker):
     ) -> "Worker|None":
         if not target_stat.exists():
             logger.info(
-                f"Checked: [COPY] {source_stat.path.as_uri()} -> {target_stat.path.as_uri()}"
+                f"Checked: [COPY] {source_stat.path.as_uri()[4:]} -> {target_stat.path.as_uri()[4:]}"
             )
             return self.create_worker(
                 type_="copy",
@@ -182,7 +182,7 @@ class CheckerCopy(Checker):
                 target_path=target_stat.path,
             )
 
-        logger.info(f"Checked: [JUMP] {source_stat.path.as_uri()}")
+        logger.debug(f"Checked: [JUMP] {source_stat.path.as_uri()[4:]}")
         return None
 
 

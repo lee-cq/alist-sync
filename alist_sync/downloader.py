@@ -7,6 +7,7 @@
 
 下载器使用一个单独线程启动，它创建一个事件循环并在其内部保持同步。
 """
+import logging
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,6 +16,9 @@ from alist_sdk import AlistPath
 
 if TYPE_CHECKING:
     ...
+
+
+logger = logging.getLogger("alist-sync.downloader")
 
 
 def find_aria2_bin(default=None):
@@ -44,12 +48,18 @@ def make_aria2_cmd(
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
     )
 
+    logs_dir = Path.cwd().joinpath("logs")
+    if logs_dir.exists() and logs_dir.is_dir():
+        log_file = logs_dir.joinpath(f"aria2c-{local.name}.log")
+    else:
+        log_file = local.as_posix() + ".log"
+
     _cmd = [
         aria2_bin,
         "-q",
         "-c",
         "-l",
-        local.as_posix() + ".log",
+        log_file,
         "--user-agent",
         ua,
         "-x",
@@ -59,7 +69,7 @@ def make_aria2_cmd(
         str(local),
         remote.as_download_uri() if isinstance(remote, AlistPath) else remote,
     ]
-    print(_cmd)
+    logger.debug("DOWNLOAD CMD: %s", " ".join(str(_) for _ in _cmd))
     return _cmd
 
 

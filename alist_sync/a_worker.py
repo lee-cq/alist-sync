@@ -74,8 +74,9 @@ class Workers:
     async def downloader(self, worker: Worker):
         """"""
         self.tmp_files.auto_clear()
-        if self.tmp_files.pre_total_size() > 15 * GB:
-            await asyncio.sleep(5)
+        if worker.tmp_file.exists():
+            if worker.tmp_file.stat().st_size == worker.source_path.stat().size:
+                worker.update(status="downloaded")
             return
         async with self.sp_downloader:
             self.tmp_files.add_tmp(worker.tmp_file, worker.source_path)
@@ -94,11 +95,13 @@ class Workers:
                 self.tmp_files.clear_file(worker.tmp_file)
                 logger.error("下载失败, 返回码: %d", rt_code)
                 raise DownloaderError(f"下载失败, 返回码: {rt_code}")
+
+            logger.info("下载成功: %s", worker.source_path.as_uri())
             worker.update(status="downloaded")
 
     async def uploader(self, worker: Worker):
         """"""
-        assert worker.tmp_file.exists(), "临时文件不存在"
+        assert worker.tmp_file.exists(), f"临时文件不存在: {self.tmp_files}"
         assert (
             worker.tmp_file.stat().st_size == worker.source_path.stat().size
         ), f"临时文件大小不一致： {worker.tmp_file.stat().st_size} != {worker.source_path.stat().size}"
