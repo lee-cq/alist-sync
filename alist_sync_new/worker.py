@@ -101,7 +101,7 @@ class Worker(pydantic.BaseModel):
             task_status.get_task(self.task.id)
 
     def recheck(self) -> bool:
-        """复查 - target存在，且大小一致。"""
+        """复查 - target存在，大小一致,mtime < 2 min"""
         now = datetime.datetime.now().timestamp()
         return (
             self.source_path.re_stat().size == self.target_path.re_stat().size
@@ -109,7 +109,9 @@ class Worker(pydantic.BaseModel):
         )
 
     def retry(self):
-        """重试"""
+        """重试
+        这个版本不考虑重试
+        """
 
     def done(self):
         """完成 - 清理工作"""
