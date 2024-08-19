@@ -26,6 +26,7 @@ i386 | i686) cpu="386" ;;
 aarch64 | arm64) cpu="arm64" ;;
 esac
 filename="alist-${platform}-${cpu}${fix}"
+# download_url="https://github.com/alist-org/alist/releases/download/v3.36.0/alist-windows-amd64.zip"
 export download_url="https://github.com/alist-org/alist/releases/download/v${VERSION}/${filename}"
 
 if [[ ! -f "alist" && ! -f "alist.exe" ]]; then

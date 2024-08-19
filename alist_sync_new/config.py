@@ -7,6 +7,18 @@
 """
 import os
 from pathlib import Path
+from typing import Optional
+from functools import cached_property
+from yaml import safe_load
+
+import peewee
+from playhouse.db_url import connect as connect_db
+from pydantic import BaseModel
+from alist_sdk import login_server
+
+__all__ = ["load_env", "Database", "Config", "config"]
+
+from alist_sync_new.const import Env
 
 
 def load_env():
@@ -28,3 +40,78 @@ def load_env():
 
         if Path().joinpath(".env").exists():
             __load_env(Path().joinpath(".env").read_text())
+
+
+class Database(BaseModel):
+    type: Optional[str] = "sqlite"  # mysql or SQLite or Postgresql[pg]
+    url: Optional[str] = ""
+    path: Optional[str] = ".data.db"  # SQLite 默认数据库存储位置
+    host: Optional[str] = "localhost"
+    port: Optional[int] = 3306
+    username: Optional[str] = "test"
+    password: Optional[str] = "test"
+    database: Optional[str] = "alist-sync"
+
+    @cached_property
+    def db(self):
+        if self.url:
+            return connect_db(self.url)
+
+        _dbc = {
+            "sqlite": peewee.SqliteDatabase,
+            "mysql": peewee.MySQLDatabase,
+            "postpresql": peewee.PostgresqlDatabase,
+            "": peewee.Database,
+        }.get(self.type)
+
+        if self.type.lower() == "sqlite":
+            return _dbc(self.path)
+        elif self.type.lower() in ["mysql", "postgresql", "pg"]:
+            return _dbc(
+                self.database,
+                host=self.host,
+                port=self.port,
+                username=self.username,
+                password=self.password,
+            )
+
+
+class AlistServer(BaseModel):
+    host: str = "http://localhost:8080"
+    username: str = "admin"
+    password: str = "admin"
+
+    def login(self):
+        login_server(self.host, self.username, self.password)
+
+
+class SyncGroup(BaseModel):
+    enabled: bool = True
+    name: str
+    max_workers: int = 5  # 最大同步线程数
+    sync_type: str = "copy"  # copy or mirror
+    sync_path: list[str]
+    backup_path: str = ".alist-sync-backup"
+    exclude: list[str] = []
+    include: list[str] = []
+
+
+class Config(BaseModel):
+    version: str = "1"  #
+    database: Database = Database()  # 数据库存储，默认SQLite
+    alist_servers: list[AlistServer]  # Alist 服务器配置信息
+    sync_groups: list[SyncGroup]  # 同步组配置信息
+    logs: dict
+
+    @classmethod
+    def load_from_yaml(cls, file: str) -> "Config":
+        dc = safe_load(Path(file).read_text())
+        return cls.model_validate(dc)
+
+    def login(self):
+        for server in self.alist_servers:
+            server.login()
+
+
+load_env()
+config = Config.load_from_yaml(os.getenv(Env.config, "config.yaml"))

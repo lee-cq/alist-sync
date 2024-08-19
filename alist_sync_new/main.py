@@ -5,27 +5,12 @@
 @Author     : LeeCQ
 @Date-Time  : 2024/8/19 0:20
 """
-from typing import Optional
-from functools import cached_property
-
-import peewee
-from pydantic import BaseModel
 
 
-class Database(BaseModel):
-    type: str = "sqlite"  # mysql or SQLite
-    path: Optional[str] = ".data.db"  # SQLite 默认数据库存储位置
-    host: Optional[str] = "localhost"
-    port: Optional[int] = 3306
-    username: Optional[str] = "test"
-    password: Optional[str] = "test"
-    database: Optional[str] = "alist-sync"
+def copy():
+    from alist_sync_new.config import config
+    from alist_sync_new.checker import Checker
 
-    @cached_property
-    def db(self):
-        return peewee.Database()
+    for sg in config.sync_groups:
+        checker = Checker(sg.sync_type, sg.sync_path)
 
-
-
-class Config(BaseModel):
-    version: str = "1"  #

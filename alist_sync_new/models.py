@@ -8,15 +8,14 @@
 from datetime import datetime
 
 from peewee import Model, CharField, DateTimeField, IntegerField, BooleanField
+from peewee import IntegrityError
 
-from peewee import SqliteDatabase, IntegrityError
-
-db = SqliteDatabase("./test.db")
+from alist_sync_new.config import config
 
 
 class BaseModel(Model):
     class Meta:
-        database = db
+        database = config.database.db
 
     def save(self, force_insert=None, only=None):
         if force_insert is not None:
@@ -100,9 +99,3 @@ class TransferLog(BaseModel):
             else f"{self.source_path} -> {self.target_path}"
         )
         return f"<models.TransferLog: [{self.transfer_type}]{tar}>"
-
-
-if __name__ == "__main__":
-    db.create_tables([Config, File, Doer, TransferLog])
-
-    Config(key="b", value="aa").save()

@@ -24,7 +24,7 @@ logger = logging.getLogger("alist-sync.worker")
 class Worker(pydantic.BaseModel):
     """工作函数"""
 
-    s_type: str
+    transfer_type: str
     source_path: AlistPathType
     target_path: AlistPathType
 
@@ -43,6 +43,38 @@ class Worker(pydantic.BaseModel):
         4. 核查
         5. 完成
         """
+        while True:
+            if self.status == const.TransferStatus.init:
+                self.backup()
+
+            elif self.status == const.TransferStatus.backed_up:
+                self.exec_()
+
+            elif self.status == const.TransferStatus.coped:
+                self.recheck()
+
+            elif self.status == const.TransferStatus.done:
+                self.done()
+                break
+
+            elif self.status == const.TransferStatus.error:
+                self.error()
+
+            else:
+                raise ValueError(
+                    f"Unknown Worker.status: {self.status}, "
+                    f"{const.TransferStatus.str()}"
+                )
+
+    def exec_(self):
+        if self.transfer_type == const.TransferType.copy:
+            self.copy_file()
+        elif self.transfer_type == const.TransferType.delete:
+            raise NotImplemented  # TODO
+        else:
+            ValueError(
+                f"Unknown Worker.t_type: {self.transfer_type}, " f"{const.TransferType.str()}"
+            )
 
     @cached_property
     def backup_name(self) -> str:
@@ -68,6 +100,10 @@ class Worker(pydantic.BaseModel):
 
     def backup(self):
         """"""
+        if not self.need_backup:
+            self.status = const.TransferStatus.backed_up
+            return
+
         try:
             stat = self.target_path.re_stat().model_dump_json()
             _backup_path: AlistPathType = self.backup_dir.joinpath(self.backup_name)
@@ -100,13 +136,18 @@ class Worker(pydantic.BaseModel):
         while self.task.status == "":
             task_status.get_task(self.task.id)
 
-    def recheck(self) -> bool:
+        self.status = const.TransferStatus.coped
+
+    def recheck_copy(self):
         """复查 - target存在，大小一致,mtime < 2 min"""
         now = datetime.datetime.now().timestamp()
-        return (
+        if (
             self.source_path.re_stat().size == self.target_path.re_stat().size
             and now - self.target_path.stat().modified.timestamp() < 120
-        )
+        ):
+            self.status = const.TransferStatus.done
+        else:
+            self.status = const.TransferStatus.error
 
     def retry(self):
         """重试

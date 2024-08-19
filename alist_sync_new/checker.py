@@ -25,6 +25,9 @@ class Checker:
         for p in self.paths:
             Doer.create_no_error(abs_path=p.joinpath(".alist-sync-backup"))
 
+    def stop(self):
+        pass
+
     def iter_check(self) -> Iterator[AlistPath, list[AlistPath]]:
         if self.sync_path == const.SyncType.mirror:
             yield self.paths[0], self.paths[1:]
