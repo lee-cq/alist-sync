@@ -7,10 +7,18 @@
 """
 from datetime import datetime
 
-from peewee import Model, CharField, DateTimeField, IntegerField, BooleanField
+from peewee import (
+    Model,
+    CharField,
+    DateTimeField,
+    IntegerField,
+    BooleanField,
+    TextField,
+)
 from peewee import IntegrityError
 
 from alist_sync_new.config import config
+from alist_sync_new.common import sha1
 
 
 class BaseModel(Model):
@@ -90,7 +98,11 @@ class TransferLog(BaseModel):
     transfer_type: str = CharField()
     source_path: str = CharField()
     target_path: str = CharField()
-    backed_up: bool = BooleanField()
+    backed_up: str = CharField(null=True)
+    status: str = CharField()
+    message: str = TextField(null=True)
+    start_time: datetime = DateTimeField()
+    end_time: datetime = DateTimeField()
 
     def __repr__(self):
         tar = (
@@ -99,3 +111,8 @@ class TransferLog(BaseModel):
             else f"{self.source_path} -> {self.target_path}"
         )
         return f"<models.TransferLog: [{self.transfer_type}]{tar}>"
+
+    def set_id(self):
+        self.log_id = sha1(
+            f"{self.transfer_type}{self.source_path}{self.target_path}{self.start_time}"
+        )

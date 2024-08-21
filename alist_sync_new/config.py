@@ -14,10 +14,11 @@ from yaml import safe_load
 import peewee
 from playhouse.db_url import connect as connect_db
 from pydantic import BaseModel
-from alist_sdk import login_server
+from alist_sdk import AlistPath, AlistPathType, login_server
 
 __all__ = ["load_env", "Database", "Config", "config"]
 
+from alist_sync_new.common import sha1
 from alist_sync_new.const import Env
 
 
@@ -77,12 +78,12 @@ class Database(BaseModel):
 
 
 class AlistServer(BaseModel):
-    host: str = "http://localhost:8080"
+    base_url: str = "http://localhost:8080"
     username: str = "admin"
     password: str = "admin"
 
     def login(self):
-        login_server(self.host, self.username, self.password)
+        login_server(self.base_url, self.username, self.password)
 
 
 class SyncGroup(BaseModel):
@@ -90,10 +91,28 @@ class SyncGroup(BaseModel):
     name: str
     max_workers: int = 5  # 最大同步线程数
     sync_type: str = "copy"  # copy or mirror
-    sync_path: list[str]
-    backup_path: str = ".alist-sync-backup"
+    sync_path: list[AlistPathType]
+    need_backup: bool = True
+    # backup_path: str = ".alist-sync-backup"
     exclude: list[str] = []
     include: list[str] = []
+
+    def get_backup_path(self, target_path: AlistPath | None) -> None | AlistPath:
+        """"""
+
+        def _get_base_dir(_t: AlistPath) -> AlistPath:
+            for sp in self.sync_path:
+                try:
+                    _t.relative_to(sp)
+                    return sp
+                except ValueError:
+                    pass
+
+        if target_path is None or not target_path.exists() or not self.need_backup:
+            return None
+
+        name = f"{sha1(target_path.as_posix())}_{int(target_path.stat().modified.timestamp())}.history"
+        return _get_base_dir(target_path).joinpath(".alist-sync-backup", name)
 
 
 class Config(BaseModel):
@@ -112,6 +131,14 @@ class Config(BaseModel):
         for server in self.alist_servers:
             server.login()
 
+    def loda_logger(self):
+        if self.logs:
+            from logging import config
+
+            config.dictConfig(self.logs)
+
 
 load_env()
 config = Config.load_from_yaml(os.getenv(Env.config, "config.yaml"))
+config.login()
+config.loda_logger()

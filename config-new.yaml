@@ -1,0 +1,48 @@
+version: "1"
+
+alist_servers:
+- base_url: http://192.168.3.10:5244/
+  username: "admin_test"
+  password: "alist_admin_test"
+  verify_ssl: false
+
+sync_groups:
+  - name: t
+    sync_path:
+    - http://192.168.3.10:5244/onedirve
+    - http://192.168.3.10:5244/Drive-New
+
+logs:
+  version: 1
+  disable_existing_loggers: true
+  formatters:
+    simple:
+      format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  handlers:
+    console:
+      class: logging.StreamHandler
+      level: DEBUG
+      formatter: simple
+      stream: ext://sys.stdout
+
+    file:
+      class: logging.handlers.RotatingFileHandler
+      level: DEBUG
+      formatter: simple
+      filename: ./logs/alist-sync.log
+      maxBytes: 10485760  # 10MB
+      backupCount: 5
+      encoding: utf8
+
+  loggers:
+    alist-sync:
+      level: DEBUG
+      handlers:
+        - console
+        - file
+
+    alist-sdk:
+      level: INFO
+      handlers:
+        - console
+        - file

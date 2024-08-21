@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from alist_sdk.path_lib import AlistPath
 
-from models import File, Doer
+from alist_sync_new.models import File, Doer
 
 
 def scan(path: AlistPath) -> Iterator[AlistPath]:
@@ -31,7 +31,9 @@ def scan(path: AlistPath) -> Iterator[AlistPath]:
         pass
 
 
-def path2file(p: AlistPath, ) -> File:
+def path2file(
+    p: AlistPath,
+) -> File:
     return File(
         abs_path=p.as_posix(),
         parent=p.parent.as_posix(),

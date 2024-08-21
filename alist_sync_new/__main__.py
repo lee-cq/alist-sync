@@ -9,6 +9,7 @@ import os
 import typer
 
 from alist_sync_new.const import Env
+from alist_sync_new.main import copy as main_copy
 
 app = typer.Typer()
 
@@ -19,3 +20,8 @@ def copy(
 ):
     """复制逻辑"""
     os.environ[Env.config] = config
+
+    main_copy()
+
+
+app()

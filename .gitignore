@@ -14,6 +14,10 @@ alist_sync/.alist-sync-cache/
 alist/
 tools/alist/
 logs/
+alist-windows-*
+alist-linux-*
+*.mp3
+
 
 # C extensions
 *.so

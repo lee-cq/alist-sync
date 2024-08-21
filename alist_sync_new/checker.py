@@ -28,7 +28,7 @@ class Checker:
     def stop(self):
         pass
 
-    def iter_check(self) -> Iterator[AlistPath, list[AlistPath]]:
+    def iter_check(self) -> Iterator[tuple[AlistPath, list[AlistPath]]]:
         if self.sync_path == const.SyncType.mirror:
             yield self.paths[0], self.paths[1:]
         elif self.sync_path == const.SyncType.copy:
@@ -47,7 +47,7 @@ class Checker:
         self,
         main_path: AlistPath,
         c_paths: list[AlistPath],
-    ) -> Iterator[TransferLog]:
+    ) -> Iterator[dict]:
         """检查器"""
         for file in scan(main_path):
             fi_info = path2file(file)
@@ -59,10 +59,8 @@ class Checker:
             for c in c_paths:
                 abs_c = c.joinpath(relative)
                 if not abs_c.exists():
-                    _tl = TransferLog(
+                    yield dict(
                         transfer_type=const.TransferType.copy,
                         source_path=file,
                         target_path=abs_c,
                     )
-                    Doer.create_no_error(abs_path=str(abs_c))
-                    yield _tl

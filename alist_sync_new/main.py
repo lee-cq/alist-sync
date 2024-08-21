@@ -9,8 +9,7 @@
 
 def copy():
     from alist_sync_new.config import config
-    from alist_sync_new.checker import Checker
+    from alist_sync_new.worker_manager import WorkerManager
 
     for sg in config.sync_groups:
-        checker = Checker(sg.sync_type, sg.sync_path)
-
+        WorkerManager(sg).start()  # TODO 线程

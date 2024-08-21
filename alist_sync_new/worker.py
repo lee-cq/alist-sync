@@ -5,16 +5,17 @@
 @Author     : LeeCQ
 @Date-Time  : 2024/8/17 18:18
 """
-import datetime
 import logging
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 from functools import cached_property
-import pydantic
+from datetime import datetime
 
+import pydantic
 from alist_sdk import AlistPathType, Task, AlistError
 
 from alist_sync_new import const
+from alist_sync_new.models import TransferLog
 from alist_sync_new.task import task_status
 from alist_sync_new.common import sha1
 
@@ -28,12 +29,14 @@ class Worker(pydantic.BaseModel):
     source_path: AlistPathType
     target_path: AlistPathType
 
-    need_backup: bool
-    backup_dir: AlistPathType
+    backup_path: AlistPathType | None = None
 
     status: str = const.TransferStatus.init
+    start_time: datetime = datetime.now()
+    end_time: datetime | None = None
 
-    task: Optional[Task] = None
+    task: Optional[Task] | None = None
+    transfer_log: TransferLog | None = None
 
     def run(self):
         """开始运行
@@ -43,8 +46,10 @@ class Worker(pydantic.BaseModel):
         4. 核查
         5. 完成
         """
+
         while True:
             if self.status == const.TransferStatus.init:
+                self.init()
                 self.backup()
 
             elif self.status == const.TransferStatus.backed_up:
@@ -73,8 +78,21 @@ class Worker(pydantic.BaseModel):
             raise NotImplemented  # TODO
         else:
             ValueError(
-                f"Unknown Worker.t_type: {self.transfer_type}, " f"{const.TransferType.str()}"
+                f"Unknown Worker.t_type: {self.transfer_type}, "
+                f"{const.TransferType.str()}"
             )
+
+    def init(self):
+        """"""
+        self.transfer_log = TransferLog(
+            transfer_type=self.transfer_type,
+            source_path=self.source_path,
+            target_path=self.target_path,
+            backup_path=self.backup_path,
+            status=self.status,
+        )
+        self.transfer_log.set_id()
+        self.transfer_log.save()
 
     @cached_property
     def backup_name(self) -> str:
@@ -121,7 +139,10 @@ class Worker(pydantic.BaseModel):
     def copy_file(self):
         """创建Copy任务"""
         if self.source_path.drive != self.target_path.drive:
-            logger.error("尚未实现在多个实例间同步数据。\n" "建议： 将多个存储挂载到同一个实例下操作。")
+            logger.error(
+                "尚未实现在多个实例间同步数据。\n"
+                "建议： 将多个存储挂载到同一个实例下操作。"
+            )
             self.status = const.TransferStatus.error
             return
             # raise NotImplemented("尚未实现在多个实例间同步数据。\n" "建议： 将多个存储挂载到同一个实例下操作。")
@@ -140,7 +161,7 @@ class Worker(pydantic.BaseModel):
 
     def recheck_copy(self):
         """复查 - target存在，大小一致,mtime < 2 min"""
-        now = datetime.datetime.now().timestamp()
+        now = datetime.now().timestamp()
         if (
             self.source_path.re_stat().size == self.target_path.re_stat().size
             and now - self.target_path.stat().modified.timestamp() < 120
