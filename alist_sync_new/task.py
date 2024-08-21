@@ -5,11 +5,14 @@
 @Author     : LeeCQ
 @Date-Time  : 2024/8/17 19:44
 """
+import os
 import threading
 import time
 
 from alist_sdk.models import Task
 from alist_sdk.path_lib import ALIST_SERVER_INFO, AlistPath
+
+from alist_sync_new.const import Env
 
 
 class TaskStatus:
@@ -48,7 +51,7 @@ class TaskStatus:
         self.thread.join()
 
     def thread_update_task(self):
-        while not self.stop_event.is_set():
+        while not self.stop_event.is_set() or os.getenv(Env.exit_flag) == "true":
             time.sleep(2)
             self.update_task()
 

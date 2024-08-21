@@ -116,3 +116,6 @@ class TransferLog(BaseModel):
         self.log_id = sha1(
             f"{self.transfer_type}{self.source_path}{self.target_path}{self.start_time}"
         )
+
+
+config.database.db.create_tables([Config, File, Doer, TransferLog])

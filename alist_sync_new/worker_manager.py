@@ -7,10 +7,13 @@
 """
 from concurrent.futures import ThreadPoolExecutor
 import time
+import logging
 
 from alist_sync_new.checker import Checker
 from alist_sync_new.config import SyncGroup
 from alist_sync_new.worker import Worker
+
+logger = logging.getLogger("alist-sync.manager")
 
 
 class WorkerManager:
@@ -24,6 +27,7 @@ class WorkerManager:
             if worker:
                 while self.workers._work_queue.qsize() > self.sync_group.max_workers:
                     time.sleep(1)
+                logger.info(f"new worker: {worker}")
                 self.workers.submit(self.run_worker, self.create_worker(worker))
 
     def stop(self):

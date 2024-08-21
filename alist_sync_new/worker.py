@@ -36,7 +36,7 @@ class Worker(pydantic.BaseModel):
     end_time: datetime | None = None
 
     task: Optional[Task] | None = None
-    transfer_log: TransferLog | None = None
+    # transfer_log: TransferLog | None = None
 
     def run(self):
         """开始运行
@@ -46,7 +46,9 @@ class Worker(pydantic.BaseModel):
         4. 核查
         5. 完成
         """
-
+        logger.info(
+            f"started Worker: [{self.transfer_type}]{self.source_path} -> {self.target_path}"
+        )
         while True:
             if self.status == const.TransferStatus.init:
                 self.init()
@@ -56,7 +58,7 @@ class Worker(pydantic.BaseModel):
                 self.exec_()
 
             elif self.status == const.TransferStatus.coped:
-                self.recheck()
+                self.recheck_copy()
 
             elif self.status == const.TransferStatus.done:
                 self.done()
@@ -64,6 +66,7 @@ class Worker(pydantic.BaseModel):
 
             elif self.status == const.TransferStatus.error:
                 self.error()
+                break
 
             else:
                 raise ValueError(
@@ -84,15 +87,15 @@ class Worker(pydantic.BaseModel):
 
     def init(self):
         """"""
-        self.transfer_log = TransferLog(
-            transfer_type=self.transfer_type,
-            source_path=self.source_path,
-            target_path=self.target_path,
-            backup_path=self.backup_path,
-            status=self.status,
-        )
-        self.transfer_log.set_id()
-        self.transfer_log.save()
+        # self.transfer_log = TransferLog(
+        #     transfer_type=self.transfer_type,
+        #     source_path=self.source_path,
+        #     target_path=self.target_path,
+        #     backup_path=self.backup_path,
+        #     status=self.status,
+        # )
+        # self.transfer_log.set_id()
+        # self.transfer_log.save()
 
     @cached_property
     def backup_name(self) -> str:
@@ -118,13 +121,14 @@ class Worker(pydantic.BaseModel):
 
     def backup(self):
         """"""
-        if not self.need_backup:
+        if not self.backup_path:
             self.status = const.TransferStatus.backed_up
+            logger.info(f"Not Need Backup: {self.target_path}")
             return
 
         try:
             stat = self.target_path.re_stat().model_dump_json()
-            _backup_path: AlistPathType = self.backup_dir.joinpath(self.backup_name)
+            _backup_path: AlistPathType = self.backup_path
             _backup_stat_path = self.backup_dir.joinpath(self.backup_name)
             _backup_path.unlink(missing_ok=True)
             _backup_stat_path.unlink(missing_ok=True)
@@ -132,9 +136,10 @@ class Worker(pydantic.BaseModel):
             self.target_path.rename(_backup_path)
             _backup_stat_path.write_text(stat)
             self.status = const.TransferStatus.backed_up
+            logger.info(f"backed Up Success: {self.target_path} -> {self.backup_path}")
         except AlistError as _e:
             # TODO
-            pass
+            logger.error(f"Backup Error: {_e}")
 
     def copy_file(self):
         """创建Copy任务"""
@@ -146,10 +151,18 @@ class Worker(pydantic.BaseModel):
             self.status = const.TransferStatus.error
             return
             # raise NotImplemented("尚未实现在多个实例间同步数据。\n" "建议： 将多个存储挂载到同一个实例下操作。")
-
+        self.target_path.parent.mkdir(parents=True, exist_ok=True)
         _t = self.source_path.client.copy(
             self.source_path.parent, self.target_path.parent, [self.source_path.name]
         )
+        if _t.code != 200:
+            logger.error(
+                f"Copy Error: [{_t.code}: {_t.message}] {str(self.source_path)} -> {str(self.target_path)}"
+            )
+        logger.info(
+            f"Coping: ID[{_t.data[0].id}]{str(self.source_path)} -> {str(self.target_path)}"
+        )
+
         assert _t.code == 200
         self.task = _t.data
         self.status = const.TransferStatus.coping

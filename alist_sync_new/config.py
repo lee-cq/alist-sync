@@ -5,6 +5,7 @@
 @Author     : LeeCQ
 @Date-Time  : 2024/8/19 0:27
 """
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -21,6 +22,8 @@ __all__ = ["load_env", "Database", "Config", "config"]
 from alist_sync_new.common import sha1
 from alist_sync_new.const import Env
 
+logger = logging.getLogger("alist-sync.config")
+
 
 def load_env():
     def __load_env(lines: str):
@@ -30,17 +33,18 @@ def load_env():
                 continue
             k, v = line.split("=", 1)
             os.environ[k] = v
+            print(f"[Info] Load Env: {k=} {v=}")
 
-        _code = Path(__file__).parent
-        if _code.joinpath(".env").exists():
-            __load_env(_code.joinpath(".env").read_text())
+    _code = Path(__file__).parent
+    if _code.joinpath(".env").exists():
+        __load_env(_code.joinpath(".env").read_text())
 
-        _code_root = _code.parent
-        if _code_root.joinpath(".env").exists():
-            __load_env(_code_root.joinpath(".env").read_text())
+    _code_root = _code.parent
+    if _code_root.joinpath(".env").exists():
+        __load_env(_code_root.joinpath(".env").read_text())
 
-        if Path().joinpath(".env").exists():
-            __load_env(Path().joinpath(".env").read_text())
+    if Path().joinpath(".env").exists():
+        __load_env(Path().joinpath(".env").read_text())
 
 
 class Database(BaseModel):
@@ -54,7 +58,7 @@ class Database(BaseModel):
     database: Optional[str] = "alist-sync"
 
     @cached_property
-    def db(self):
+    def db(self) -> peewee.Database:
         if self.url:
             return connect_db(self.url)
 
@@ -83,7 +87,7 @@ class AlistServer(BaseModel):
     password: str = "admin"
 
     def login(self):
-        login_server(self.base_url, self.username, self.password)
+        login_server(self.base_url, username=self.username, password=self.password)
 
 
 class SyncGroup(BaseModel):

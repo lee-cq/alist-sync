@@ -8,6 +8,7 @@
 
 
 class Env:
+    exit_flag = "ALIST_SYNC_EXIT_FLAG"
     config = "ALIST_SYNC_CONFIG"
     debug = "ALIST_SYNC_DEBUG"
 

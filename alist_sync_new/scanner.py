@@ -5,6 +5,7 @@
 @Author     : LeeCQ
 @Date-Time  : 2024/8/16 22:31
 """
+import logging
 from datetime import datetime
 from typing import Iterator
 from queue import Queue
@@ -14,16 +15,21 @@ from alist_sdk.path_lib import AlistPath
 
 from alist_sync_new.models import File, Doer
 
+logger = logging.getLogger("alist-sync.scanner")
+
 
 def scan(path: AlistPath) -> Iterator[AlistPath]:
     """"""
 
     if Doer.get_or_none(abs_path=str(path)):
+        logger.info(f"跳过目录: {path}")
         return
     if path.is_file():
+        logger.debug(f"Find File: {path}")
         yield path
     else:
         for p in path.iterdir():
+            logger.debug(f"递归目录: {p}")
             yield from scan(p)
     try:
         Doer(abs_path=str(path)).save(force_insert=True)
@@ -77,24 +83,3 @@ def scan_multi(path: AlistPath, threads=3, max_size=30) -> Iterator[AlistPath]:
             pool.shutdown(wait=True)
             break
         yield _d
-
-
-if __name__ == "__main__":
-    from alist_sdk.path_lib import login_server
-    from models import db
-    import logging
-
-    logger = logging.getLogger("peewee")
-    logger.addHandler(logging.StreamHandler())
-    logger.setLevel("DEBUG")
-
-    db.connect()
-
-    login_server(
-        server="https://alist.leecq.cn",
-        username="admin_test",
-        password="alist_admin_test",
-    )
-
-    a = AlistPath("https://alist.leecq.cn/Drive-New/code/")
-    print(list(scan_file(a)))

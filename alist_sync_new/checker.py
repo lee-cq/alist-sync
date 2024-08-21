@@ -6,6 +6,7 @@
 @Date-Time  : 2024/8/17 15:16
 """
 
+import logging
 from typing import Iterator
 
 from alist_sdk import AlistPath
@@ -13,6 +14,8 @@ from alist_sdk import AlistPath
 from alist_sync_new import const
 from alist_sync_new.models import File, TransferLog, Doer
 from alist_sync_new.scanner import path2file, scan
+
+logger = logging.getLogger("alist-sync.checker")
 
 
 class Checker:
@@ -23,6 +26,7 @@ class Checker:
         self.paths = path
 
         for p in self.paths:
+            # 保证 .alist-sync-backup 不会被同步
             Doer.create_no_error(abs_path=p.joinpath(".alist-sync-backup"))
 
     def stop(self):
@@ -54,11 +58,13 @@ class Checker:
             db_info = File.get_or_none(abs_path=fi_info.abs_path)
             if db_info is not None and fi_info == db_info:
                 # 文件内容没有变更，下一个
+                logger.debug(f"No Change: {file}")
                 continue
             relative = file.relative_to(main_path)
             for c in c_paths:
                 abs_c = c.joinpath(relative)
                 if not abs_c.exists():
+                    logger.info(f"Copy: {file} -> {abs_c}")
                     yield dict(
                         transfer_type=const.TransferType.copy,
                         source_path=file,
