@@ -12,10 +12,8 @@ dependencies = [
     "alist-sdk",
     "typer",
     "rich",
-    "async-lru",
     "pydantic",
     "pyyaml",
-    "pymongo"
 ]
 dynamic = ["version"]
 

@@ -1,20 +1,8 @@
-name: Alist Sync
+name: Alist Server
 run-name: "action-${{github.actor}}-${{github.run_id}}-${{github.run_number}}"
 on:
   workflow_dispatch:
-    inputs:
-      reload_storage:
-        description: 删除现有存储库，并从配置文件或远程配置中重新创建存储器
-        type: boolean
-        required: false
-        default: false
 
-
-      debug:
-        description: 开启调试模式
-        type: boolean
-        required: false
-        default: false
 
 env:
   _ALIST_SYNC_NAME: "${{github.run-name}}"
@@ -34,13 +22,6 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e .
-      
-
       - name: Create Tunnel for Cloudflare
         run: |
           echo RUNNER = ${_ALIST_SYNC_NAME}
@@ -56,23 +37,13 @@ jobs:
           echo "CLOUDFLARE_INSTALLED=true" >> "$GITHUB_ENV"
           echo "Cloudflare Tunnel Installed."
 
-
-      - name: Install Alist
-        run: |
-          ALIST_VERSION=$(curl -s https://api.github.com/repos/alist-org/alist/releases/latest | grep tag_name | cut -d '"' -f 4)
-          export ALIST_VERSION
-          
-          download_url="https://github.com/alist-org/alist/releases/download/${version}/alist-linux-amd64.tar.gz"
-          
-          wget -O alist.zip $download_url
-          tar -xf alist.zip
-          
-          ./alist admin password --set "$_ALIST_ADMIN_PASSWORD"
-          sed -i"" s'"workers": 5/"workers": 10/'g data/config.json
-
       - name: Install and Init Alist Server
         env:
           _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
+
+          _ALIST_BACKUP_URL: ${{secrets.ALIST_BACKUP_URL}}
+          _ALIST_BACKUP_USERNAME: ${{secrets.ALIST_BACKUP_USERNAME}}
+          _ALIST_BACKUP_PASSWORD: ${{secrets.ALIST_BACKUP_PASSWORD}}
         run: |
           sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
           ALIST_VERSION=$(curl -s https://api.github.com/repos/alist-org/alist/releases/latest | grep tag_name | cut -d '"' -f 4)
@@ -80,24 +51,9 @@ jobs:
           bash -ex bootstrap.sh install
           bash -x bootstrap.sh alist-init
           bash -x bootstrap.sh alist start
-
-      - name: Create Storage for Alist
-        env:
-          _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
-
-          _ALIST_BACKUP: ${{secrets.ALIST_BACKUP}}
-          _ALIST_BACKUP_URL: ${{secrets.ALIST_BACKUP_URL}}
-          _ALIST_BACKUP_USERNAME: ${{secrets.ALIST_BACKUP_USERNAME}}
-          _ALIST_BACKUP_PASSWORD: ${{secrets.ALIST_BACKUP_PASSWORD}}
-
-          _RELOAD_STORAGE: ${{ github.event.inputs.reload_storage }}
-        run: |
-          echo RUNNER = ${_ALIST_SYNC_NAME}
-          # 这将会导入全部的内容包括：设置，元数据，用户，存储器。
-          echo $(pwd)
           python3 tools/create_storage.py
+          bash -x bootstrap.sh alist stop
 
       - name: Run Alist Server
         run: |
-          ./bootstrap.sh alist stop
-          ./bootstrap.sh alist sever
+          ./bootstrap.sh alist server

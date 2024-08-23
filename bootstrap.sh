@@ -2,11 +2,11 @@
 
 cd "$(dirname "$0")" || exit 1
 
-set -a
-. .env
-set +a
-
-# which python3 >/dev/null || alias python3=python
+if [ -f .env ]; then
+  set -a
+  . .env
+  set +a
+fi
 
 if uname | grep -iq "NT"; then
   PYTHONPATH="$(pwd);${PYTHONPATH}"
