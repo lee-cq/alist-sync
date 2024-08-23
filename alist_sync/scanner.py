@@ -1,101 +1,85 @@
-# coding: utf8
-import asyncio
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+@File Name  : scanner.py
+@Author     : LeeCQ
+@Date-Time  : 2024/8/16 22:31
+"""
 import logging
-from pathlib import PurePosixPath
+from datetime import datetime
+from typing import Iterator
+from queue import Queue
+from concurrent.futures import ThreadPoolExecutor
 
-from alist_sdk import Item, AlistPath
-from pydantic import BaseModel
+from alist_sdk.path_lib import AlistPath
 
-from alist_sync.alist_client import AlistClient
-from alist_sync.common import get_alist_client
+from alist_sync.models import File, Doer
 
-
-logger = logging.getLogger("alist-sync.scan-dir")
-
-__all__ = ["scan_dirs", "Scanner"]
+logger = logging.getLogger("alist-sync.scanner")
 
 
-class Scanner(BaseModel):
-    # scan_path: list[item]
-    queue: asyncio.Queue = asyncio.Queue(30)
-    items: dict[str | PurePosixPath, list[Item]]
+def scan(path: AlistPath) -> Iterator[AlistPath]:
+    """"""
 
-    model_config = {"arbitrary_types_allowed": True}
-
-    @classmethod
-    async def scans(cls, *scan_path, client: AlistClient = None):
-        """扫描目录"""
-        client = client or get_alist_client()
-        return cls(
-            items={
-                k: v
-                for k, v in await asyncio.gather(
-                    *[cls.scan(path, client) for path in scan_path]
-                )
-            }
-        )
-
-    @classmethod
-    async def retry(cls, client, _path, _rt=5) -> list[Item]:
-        __res = await client.list_files(_path, refresh=True)
-        if __res.code != 200:
-            logger.warning(f"扫描目录异常: {_path=} {__res.code=} {__res.message=}")
-            if _rt:
-                return await cls.retry(client, _path, _rt=_rt - 1)
-            exit(1)
-        return __res.data.content or []
-
-    @classmethod
-    async def get_files(cls, client, _path, output):
-        _path = PurePosixPath(_path)
-        if _path.name == ".alist-sync-data":
-            logger.debug("跳过 .alist-sync-data ...")
-            return
-
-        __res = await cls.retry(client, _path)
-        for _item in __res:
-            _item: Item
-            _item.parent = _path
-            if _item.is_dir:
-                # noinspection PyAsyncCall
-                asyncio.create_task(
-                    cls.get_files(client, _item.full_name, output),
-                    name=f"scan_{_item.full_name}",
-                )
-            else:
-                # _list.append(_item)
-                await cls.queue.put(_item)
-                logger.debug("find: %s", _item.full_name)
-                return _item
-
-    @classmethod
-    async def scan(
-        cls,
-        path: str | PurePosixPath,
-        client: AlistClient,
-        output: list | asyncio.Queue = None,
-    ) -> tuple[str, list[Item]]:
-        """扫描目录"""
-        if output is None:
-            output: list[Item] = []
-
-        logger.info("扫描目录 %s 中的文件.", path)
-        await cls.get_files(client, path, output)
-        await cls.lock()
-        return path, output
-
-    @staticmethod
-    async def lock():
-        pre = f"scan"
-        while True:
-            await asyncio.sleep(1)
-            names = [i.get_name() for i in asyncio.all_tasks() if pre in i.get_name()]
-            logger.debug("lock: %s: %s", pre, names)
-            if not names:
-                return
+    if Doer.get_or_none(abs_path=str(path)):
+        logger.info(f"跳过目录: {path}")
+        return
+    if path.is_file():
+        logger.debug(f"Find File: {path}")
+        yield path
+    else:
+        logger.debug(f"递归目录: {path}")
+        for p in path.iterdir():
+            yield from scan(p)
+    try:
+        Doer(abs_path=str(path)).save(force_insert=True)
+    except:
+        pass
 
 
-async def scan_dirs(*scan_path, client: AlistClient = None) -> Scanner:
-    """扫描目录"""
-    client = client or get_alist_client()
-    return await Scanner.scans(*scan_path, client=client)
+def path2file(
+    p: AlistPath,
+) -> File:
+    return File(
+        abs_path=p.as_posix(),
+        parent=p.parent.as_posix(),
+        mtime=p.stat().modified,
+        hash=p.stat().hash_info or "",
+        size=p.stat().size,
+        update_time=datetime.now(),
+        update_owner="scan",
+    )
+
+
+def scan_file(path: AlistPath) -> Iterator[File]:
+    for p in scan(path):
+        file = path2file(p)
+        file.save()
+        yield file
+
+
+def scan_multi(path: AlistPath, threads=3, max_size=30) -> Iterator[AlistPath]:
+    """多线程的扫描"""
+    worker_count = 0
+
+    def _scan(_path: AlistPath):
+        if _path.is_file():
+            _qu.put(_path)
+            data["worker_count"] -= 1
+        else:
+            for _p in _path.iterdir():
+                pool.submit(_scan, _p)
+                data["worker_count"] += 1
+        if data["worker_count"] == 0:
+            _qu.put(None)
+
+    data = {"worker_count": 0}
+    pool = ThreadPoolExecutor(max_workers=threads)
+    _qu = Queue(maxsize=max_size)
+    pool.submit(_scan, path)
+    while True:
+        _d = _qu.get()
+        if _d is None:
+            pool.shutdown(wait=True)
+            break
+        yield _d

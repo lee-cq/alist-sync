@@ -2,6 +2,13 @@
 
 cd "$(dirname "$0")" || exit 1
 
+set -a
+. .env
+set +a
+
+# which python3 >/dev/null || alias python3=python
+export PYTHONPATH=$(pwd):${PYTHONPATH}
+
 all_clear() {
     echo ".pytest_cache"
     find . -type d -name ".pytest_cache" -exec rm -rf {} \; 2>/dev/null
@@ -39,7 +46,7 @@ clear)
     all_clear
     ;;
 
-clear-log )
+clear-log)
     rm -rf logs/*
     rm -rf alist/data/log/*
     ./bootstrap.sh alist restart
@@ -54,7 +61,7 @@ test)
     pytest -v "$@"
     ;;
 
-main )
+main)
     shift
     python -m alist_sync "$@"
     ;;
@@ -62,7 +69,9 @@ main )
 debugger)
     all_clear
     clear
-    python3 tests/debugger.py
+    _type=$2
+    shift 2
+    python tests/debuger_${_type}.py "$@"
     ;;
 
 *)

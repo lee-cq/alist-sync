@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 from typing import NamedTuple
 
-from alist_sdk import Client
+from alist_sdk import Client, login_server as _login_server
 
 from alist_sync.config import create_config
 
@@ -20,6 +20,15 @@ WORKDIR.mkdir(exist_ok=True, parents=True)
 DATA_DIR = StorageInfo("/local", WORKDIR / "alist/test_dir")
 DATA_DIR_DST = StorageInfo("/local_dst", WORKDIR / "alist/test_dir_dst")
 DATA_DIR_DST2 = StorageInfo("/local_dst2", WORKDIR / "alist/test_dir_dst2")
+
+
+def login_server():
+    _login_server(
+        os.getenv("ALIST_HOST"),
+        username=os.getenv("ALIST_USERNAME"),
+        password=os.getenv("ALIST_PASSWORD"),
+        verify=False,
+    )
 
 
 def create_storage_local(client_, mount_name, local_path: Path):

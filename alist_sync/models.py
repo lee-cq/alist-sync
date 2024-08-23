@@ -17,8 +17,8 @@ from peewee import (
 )
 from peewee import IntegrityError
 
-from alist_sync_new.config import config
-from alist_sync_new.common import sha1
+from alist_sync.config import config
+from alist_sync.common import sha1
 
 
 class BaseModel(Model):

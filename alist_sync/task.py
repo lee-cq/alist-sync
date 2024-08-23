@@ -12,7 +12,7 @@ import time
 from alist_sdk.models import Task
 from alist_sdk.path_lib import ALIST_SERVER_INFO, AlistPath
 
-from alist_sync_new.const import Env
+from alist_sync.const import Env
 
 
 class TaskStatus:

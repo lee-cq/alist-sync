@@ -1,253 +1,158 @@
-import builtins
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+@File Name  : config.py.py
+@Author     : LeeCQ
+@Date-Time  : 2024/8/19 0:27
+"""
 import logging
 import os
-import time
-from datetime import datetime
 from pathlib import Path
-from functools import cached_property, lru_cache
-from typing import Optional, Literal, TYPE_CHECKING, Any, Annotated
+from typing import Optional
+from functools import cached_property
+from yaml import safe_load
 
-from alist_sdk import AlistPathType, AlistPath
-from alist_sdk.path_lib import AlistPathPydanticAnnotation
-from httpx import URL
-from pydantic import Field, BaseModel, BeforeValidator
-from pymongo.database import Database
+import peewee
+from playhouse.db_url import connect as connect_db
+from pydantic import BaseModel
+from alist_sdk import AlistPath, AlistPathType, login_server
 
+__all__ = ["load_env", "Database", "Config", "config"]
 
-if TYPE_CHECKING:
-    from alist_sync.data_handle import ShelveHandle, MongoHandle
+from alist_sync.common import sha1
+from alist_sync.const import Env
 
 logger = logging.getLogger("alist-sync.config")
 
-PAlistPathType = Annotated[
-    AlistPathType,
-    AlistPathPydanticAnnotation,
-    BeforeValidator(
-        lambda x: (
-            URL("http://localhost:5244").join(x).__str__()
-            if not URL(x).is_absolute_url
-            else x
-        )
-    ),
-]
 
-TrueValues = {"true", "1", "yes", "on", "y", "t", "1"}
-FalseValues = {"false", "0", "no", "off", "n", "f", "0"}
+def load_env():
+    def __load_env(file: Path):
+        print("Load Env From:", file)
+        for line in file.read_text().split("\n"):
+            line = line.strip().strip("\t")
+            if line == "" or line.startswith("#") or line.startswith(";"):
+                continue
+            k, v = line.split("=", 1)
+            os.environ[k] = v
+            print(f"[Info] Load Env: {k=} {v=}")
+
+    _code = Path(__file__).parent
+    if _code.joinpath(".env").exists():
+        __load_env(_code.joinpath(".env"))
+
+    _code_root = _code.parent
+    if _code_root.joinpath(".env").exists():
+        __load_env(_code_root.joinpath(".env"))
+
+    if Path().joinpath(".env").exists():
+        __load_env(Path().joinpath(".env"))
 
 
-def getenv(name, default=None):
-    """获取环境变量"""
-    return os.getenv(name, os.getenv("_" + name, default))
+class Database(BaseModel):
+    type: Optional[str] = "sqlite"  # mysql or SQLite or Postgresql[pg]
+    url: Optional[str] = ""
+    path: Optional[str] = ".data.db"  # SQLite 默认数据库存储位置
+    host: Optional[str] = "localhost"
+    port: Optional[int] = 3306
+    username: Optional[str] = "test"
+    password: Optional[str] = "test"
+    database: Optional[str] = "alist-sync"
 
+    @cached_property
+    def db(self) -> peewee.Database:
+        if self.url:
+            return connect_db(self.url)
 
-def create_config():
-    """创建配置文件"""
-    if hasattr(builtins, "sync_config"):
-        return builtins.sync_config
+        _dbc = {
+            "sqlite": peewee.SqliteDatabase,
+            "mysql": peewee.MySQLDatabase,
+            "postpresql": peewee.PostgresqlDatabase,
+            "": peewee.Database,
+        }.get(self.type)
 
-    config_file = getenv(
-        "ALIST_SYNC_CONFIG", Path(__file__).parent.parent / "config.yaml"
-    )
-
-    _sync_config = Config.load_from_yaml(config_file)
-    setattr(builtins, "sync_config", _sync_config)
-    return _sync_config
+        if self.type.lower() == "sqlite":
+            return _dbc(self.path)
+        elif self.type.lower() in ["mysql", "postgresql", "pg"]:
+            return _dbc(
+                self.database,
+                host=self.host,
+                port=self.port,
+                username=self.username,
+                password=self.password,
+            )
 
 
 class AlistServer(BaseModel):
-    """"""
+    base_url: str = "http://localhost:8080"
+    username: str = "admin"
+    password: str = "admin"
+    verity: bool = True
+    timeout: int = 10
 
-    base_url: str = "http://localhost:5244"
-    username: Optional[str] = ""
-    password: Optional[str] = ""
-    token: Optional[str] = None
-    has_opt: Optional[bool] = False
-
-    max_connect: int = 30  # 最大同时连接数
-    storage_config: Optional[Path] = None
-
-    # httpx 的参数
-    verify: Optional[bool] = True
-    headers: Optional[dict] = None
-
-    def dump_for_alist_client(self):
-        return self.model_dump(exclude={"storage_config"})
-
-    def dump_for_alist_path(self):
-        _data = self.model_dump(
-            exclude={"storage_config", "max_connect"},
-            by_alias=True,
+    def login(self):
+        login_server(
+            self.base_url,
+            username=self.username,
+            password=self.password,
+            verify=self.verity,
+            timeout=self.timeout,
         )
-        _data["server"] = _data.pop("base_url")
-        return _data
-
-
-def set_add(x) -> set:
-    x = set(x)
-    x.add(".alist-sync*")
-    return x
 
 
 class SyncGroup(BaseModel):
-    def __hash__(self):
-        return hash(self.name + self.type)
-
-    enable: bool = True
+    enabled: bool = True
     name: str
-    type: str
-    interval: int = 300
-    need_backup: bool = False
-    backup_dir: str = ".alist-sync-backup"
-    blacklist: Annotated[list[str], BeforeValidator(lambda x: set_add(x))] = []
-    whitelist: Annotated[list[str], BeforeValidator(lambda x: set_add(x))] = []
-    group: list[PAlistPathType] = Field(min_length=2)
+    max_workers: int = 5  # 最大同步线程数
+    sync_type: str = "copy"  # copy or mirror
+    sync_path: list[AlistPathType]
+    need_backup: bool = True
+    # backup_path: str = ".alist-sync-backup"
+    exclude: list[str] = []
+    include: list[str] = []
 
+    def get_backup_path(self, target_path: AlistPath | None) -> None | AlistPath:
+        """"""
 
-NotifyType = Literal["email", "webhook"]
+        def _get_base_dir(_t: AlistPath) -> AlistPath:
+            for sp in self.sync_path:
+                try:
+                    _t.relative_to(sp)
+                    return sp
+                except ValueError:
+                    pass
 
+        if target_path is None or not target_path.exists() or not self.need_backup:
+            return None
 
-class EMailNotify(BaseModel):
-    enable: bool = True
-    type: NotifyType = "email"
-    smtp_host: str
-    smtp_port: int = 25
-    sender: str
-    password: str
-    recipients: list[str]
-
-
-class WebHookNotify(BaseModel):
-    enable: bool = True
-    type: NotifyType = "webhook"
-    webhook_url: str
-    headers: dict[str, str]
+        name = f"{sha1(target_path.as_posix())}_{int(target_path.stat().modified.timestamp())}.history"
+        return _get_base_dir(target_path).joinpath(".alist-sync-backup", name)
 
 
 class Config(BaseModel):
-    """配置"""
-
-    def __hash__(self):
-        return hash(self._id)
-
-    _id: str = getenv("ALIST_SYNC_NAME", "alist-sync")
-
-    cache__dir: Path = Field(
-        default=getenv(
-            "ALIST_SYNC_CACHE_DIR",
-            Path(__file__).parent / ".alist-sync-cache",
-        ),
-        alias="cache_dir",
-    )
-
-    timeout: int = Field(10)
-    ua: str = None
-
-    daemon: bool = getenv("ALIST_SYNC_DAEMON", "false").lower() in TrueValues
-
-    name: str = getenv("ALIST_SYNC_NAME", "alist-sync")
-
-    mongodb_uri: str | None = getenv("ALIST_SYNC_MONGODB_URI", None)
-
-    notify: list[EMailNotify | WebHookNotify] = []
-
-    alist_servers: list[AlistServer] = []
-    sync_groups: list[SyncGroup] = []
-
-    create_time: datetime = datetime.now()
-    logs: dict = None
-
-    debug: bool = getenv("ALIST_SYNC_DEBUG", "false").lower() in TrueValues
-
-    def __init__(self, **data: Any):
-        super().__init__(**data)
-        import logging.config
-
-        _ = self.start_time
-        if self.logs:
-            Path("logs").mkdir(exist_ok=True, parents=True)
-            logging.config.dictConfig(self.logs)
-
-    @cached_property
-    def start_time(self) -> int:
-        return int(time.time())
-
-    @cached_property
-    def cache_dir(self) -> Path:
-        self.cache__dir.mkdir(exist_ok=True, parents=True)
-        return self.cache__dir
-
-    @lru_cache(10)
-    def get_server(self, base_url) -> AlistServer:
-        """找到AlistServer"""
-        if isinstance(base_url, AlistPath):
-            base_url = base_url.as_uri()
-        find_server = URL(base_url)
-        for server in self.alist_servers:
-            server_ = URL(server.base_url)
-            if find_server.host == server_.host and find_server.port == server_.port:
-                return server
-        raise ModuleNotFoundError()
-
-    @cached_property
-    def mongodb(self) -> "Database|None":
-        from pymongo import MongoClient
-        from pymongo.server_api import ServerApi
-
-        if self.mongodb_uri is None:
-            return None
-
-        logger.info("Contenting MongoDB ...")
-        db = MongoClient(
-            self.mongodb_uri, server_api=ServerApi("1")
-        ).get_default_database()
-        logger.info(f"Contented MongoDB: {db.client.HOST}/{db.name}")
-        if db is None:
-            raise ValueError("连接数据库失败")
-
-        return db
-
-    @cached_property
-    def handle(self) -> "ShelveHandle|MongoHandle":
-        from alist_sync.data_handle import ShelveHandle, MongoHandle
-
-        if self.mongodb is None:
-            return ShelveHandle(self.cache_dir)
-        return MongoHandle(self.mongodb)
+    version: str = "1"  #
+    database: Database = Database()  # 数据库存储，默认SQLite
+    alist_servers: list[AlistServer]  # Alist 服务器配置信息
+    sync_groups: list[SyncGroup]  # 同步组配置信息
+    logs: dict
 
     @classmethod
-    def load_from_yaml(cls, file: Path) -> "Config":
-        from yaml import safe_load
+    def load_from_yaml(cls, file: str) -> "Config":
+        dc = safe_load(Path(file).read_text())
+        return cls.model_validate(dc)
 
-        return cls.model_validate(safe_load(file.open("rb")))
+    def login(self):
+        for server in self.alist_servers:
+            server.login()
 
-    def dump_to_yaml(self, file: Path = None):
-        from yaml import safe_dump
+    def loda_logger(self):
+        if self.logs:
+            from logging import config
 
-        return safe_dump(
-            self.model_dump(mode="json"),
-            file.open("wb") if file else None,
-            sort_keys=False,
-            allow_unicode=True,
-        )
-
-    def load_from_mongo(self, uri: str = None):
-        from pymongo import MongoClient
-
-        col = MongoClient(uri).get_default_database()["config"]
-        data = col.find_one({"_id": self._id})
-        return self.model_validate(data)
-
-    def dump_to_mongodb(self):
-        return self.mongodb["config"].update_one(
-            {"_id": self._id},
-            {"$set": self.model_dump(mode="json")},
-            True,
-        )
+            config.dictConfig(self.logs)
 
 
-# sync_config = create_config()
-
-
-if __name__ == "__main__":
-
-    print(Config.model_json_schema())
+load_env()
+config = Config.load_from_yaml(os.getenv(Env.config, "config.yaml"))
+config.login()
+config.loda_logger()
+logger.info("COnfig Load Success.")

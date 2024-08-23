@@ -9,9 +9,9 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 import logging
 
-from alist_sync_new.checker import Checker
-from alist_sync_new.config import SyncGroup
-from alist_sync_new.worker import Worker
+from alist_sync.checker import Checker
+from alist_sync.config import SyncGroup
+from alist_sync.worker import Worker
 
 logger = logging.getLogger("alist-sync.manager")
 

@@ -11,9 +11,9 @@ from typing import Iterator
 
 from alist_sdk import AlistPath
 
-from alist_sync_new import const
-from alist_sync_new.models import File, TransferLog, Doer
-from alist_sync_new.scanner import path2file, scan
+from alist_sync import const
+from alist_sync.models import File, TransferLog, Doer
+from alist_sync.scanner import path2file, scan
 
 logger = logging.getLogger("alist-sync.checker")
 
