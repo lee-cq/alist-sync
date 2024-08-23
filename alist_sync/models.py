@@ -25,15 +25,15 @@ class BaseModel(Model):
     class Meta:
         database = config.database.db
 
-    def save(self, force_insert=None, only=None):
-        if force_insert is not None:
-            return super(BaseModel, self).save(force_insert, only)
-        try:
-            if only is not None:
-                return super(BaseModel, self).save(force_insert=False, only=only)
-            return super(BaseModel, self).save(force_insert=True, only=only)
-        except IntegrityError as _e:
-            return self.update()
+    # def save(self, force_insert=None, only=None):
+    #     if force_insert is not None:
+    #         return super(BaseModel, self).save(force_insert, only)
+    #     try:
+    #         if only is not None:
+    #             return super(BaseModel, self).save(force_insert=False, only=only)
+    #         return super(BaseModel, self).save(force_insert=True, only=only)
+    #     except IntegrityError as _e:
+    #         return self.update()
 
     @classmethod
     def create_no_error(cls, **query):
@@ -98,11 +98,11 @@ class TransferLog(BaseModel):
     transfer_type: str = CharField()
     source_path: str = CharField()
     target_path: str = CharField()
-    backed_up: str = CharField(null=True)
+    backup_path: str = CharField(null=True)
     status: str = CharField()
     message: str = TextField(null=True)
-    start_time: datetime = DateTimeField()
-    end_time: datetime = DateTimeField()
+    start_time: datetime = DateTimeField(default=datetime.now)
+    end_time: datetime | None = DateTimeField(null=True)
 
     def __repr__(self):
         tar = (

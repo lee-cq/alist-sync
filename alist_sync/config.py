@@ -7,6 +7,7 @@
 """
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Optional
 from functools import cached_property
@@ -17,12 +18,21 @@ from playhouse.db_url import connect as connect_db
 from pydantic import BaseModel
 from alist_sdk import AlistPath, AlistPathType, login_server
 
-__all__ = ["load_env", "Database", "Config", "config"]
+__all__ = [
+    "load_env",
+    "Database",
+    "Config",
+    "AlistServer",
+    "SyncGroup",
+    "config",
+    "sync_trace",
+]
 
 from alist_sync.common import sha1
 from alist_sync.const import Env
 
 logger = logging.getLogger("alist-sync.config")
+sync_trace = logging.getLogger("sync_trace")
 
 
 def load_env():
@@ -130,21 +140,22 @@ class SyncGroup(BaseModel):
 
 class Config(BaseModel):
     version: str = "1"  #
+    runner_id: str = f"alist-sync-{int(time.time())}"  # 运行器ID
     database: Database = Database()  # 数据库存储，默认SQLite
     alist_servers: list[AlistServer]  # Alist 服务器配置信息
     sync_groups: list[SyncGroup]  # 同步组配置信息
-    logs: dict
+    logs: dict | None = None  # 日志配置信息
 
     @classmethod
     def load_from_yaml(cls, file: str) -> "Config":
-        dc = safe_load(Path(file).read_text())
+        dc = safe_load(Path(file).read_text(encoding="utf-8"))
         return cls.model_validate(dc)
 
     def login(self):
         for server in self.alist_servers:
             server.login()
 
-    def loda_logger(self):
+    def load_logger(self):
         if self.logs:
             from logging import config
 
@@ -154,5 +165,5 @@ class Config(BaseModel):
 load_env()
 config = Config.load_from_yaml(os.getenv(Env.config, "config.yaml"))
 config.login()
-config.loda_logger()
-logger.info("COnfig Load Success.")
+config.load_logger()
+logger.info("Config Load Success.")

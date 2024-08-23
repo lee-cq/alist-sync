@@ -18,6 +18,7 @@ logger = logging.getLogger("alist-sync.manager")
 
 class WorkerManager:
     def __init__(self, sync_group: SyncGroup):
+        logger.info(f"New SyncGroup: {sync_group}")
         self.sync_group = sync_group
         self.workers = ThreadPoolExecutor(max_workers=sync_group.max_workers)
         self.checker = Checker(sync_group.sync_type, *sync_group.sync_path)
@@ -42,5 +43,7 @@ class WorkerManager:
     def run_worker(self, worker):
         try:
             worker.run()
+        except Exception as e:
+            logger.error(f"worker {worker.target_path} error: {e}")
         finally:
             pass

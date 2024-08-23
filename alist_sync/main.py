@@ -20,8 +20,6 @@ def copy():
     from alist_sync.config import config
     from alist_sync.worker_manager import WorkerManager
 
-    atexit.register(lambda: os.environ.setdefault(Env.exit_flag, "true"))
-
     for sg in config.sync_groups:
         logger.info(f"Start Sync Group: {sg.name}")
         WorkerManager(sg).start()  # TODO 线程

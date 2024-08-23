@@ -25,6 +25,7 @@ class TaskStatus:
         self.thread = threading.Thread(
             target=self.thread_update_task,
             name="task-status-updater",
+            daemon=True,
         )
         self.thread.start()
 
@@ -70,7 +71,7 @@ class TaskStatus:
                 self.tasks[i.id] = i
 
     def get_task(self, _id) -> Task:
-        return self.tasks[_id]
+        return self.tasks.get(_id)
 
     def status(self, _id: str) -> str:
         try:

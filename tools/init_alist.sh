@@ -4,7 +4,7 @@ cd "${1:-$(dirname "$0")}" || exit
 
 echo "INSTALL ALIST. PWD: $(pwd)"
 
-__AIST_ADMIN_PASSWORD="${_ALIST_ADMIN_PASSWORD:-123456}"
+__ALIST_ADMIN_PASSWORD="${_ALIST_ADMIN_PASSWORD:-123456}"
 
 mkdir -p alist
 cd alist || exit
@@ -15,9 +15,9 @@ platform=$(uname -s | tr '[:upper:]' '[:lower:]')
 case $platform in
 linux | darwin) fix=".tar.gz" ;;
 win* | mingw64*)
-    fix=".zip"
-    platform="windows"
-    ;;
+  fix=".zip"
+  platform="windows"
+  ;;
 esac
 
 case $(uname -m) in
@@ -27,20 +27,20 @@ aarch64 | arm64) cpu="arm64" ;;
 esac
 filename="alist-${platform}-${cpu}${fix}"
 # download_url="https://github.com/alist-org/alist/releases/download/v3.36.0/alist-windows-amd64.zip"
-export download_url="https://github.com/alist-org/alist/releases/download/v${VERSION}/${filename}"
+export download_url="https://github.com/alist-org/alist/releases/download/${VERSION}/${filename}"
 
 if [[ ! -f "alist" && ! -f "alist.exe" ]]; then
-    set -e
-    echo "Will Install ${download_url}"
-    curl -SLkO "$download_url"
-    if [ "${fix}" == ".zip" ]; then
-        unzip "$filename"
-    else
-        tar xzvf "$filename"
-    fi
-    set +e
+  set -e
+  echo "Will Install ${download_url}"
+  curl -SLkO "$download_url"
+  if [ "${fix}" == ".zip" ]; then
+    unzip "$filename"
+  else
+    tar xzvf "$filename"
+  fi
+  set +e
 fi
 
 rm -rf data/ test_dir/
-./alist admin set "${__AIST_ADMIN_PASSWORD}"
-./alist restart
+./alist admin set "${__ALIST_ADMIN_PASSWORD}"
+sed -i"" s'/"workers": 5/"workers": 10/'g data/config.json
