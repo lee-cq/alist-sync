@@ -24,6 +24,7 @@ def scan(path: AlistPath) -> Iterator[AlistPath]:
     if Doer.get_or_none(abs_path=str(path)):
         logger.info(f"跳过目录: {path}")
         return
+
     if path.is_file():
         logger.debug(f"Find File: {path}")
         yield path
@@ -31,10 +32,8 @@ def scan(path: AlistPath) -> Iterator[AlistPath]:
         logger.debug(f"递归目录: {path}")
         for p in path.iterdir():
             yield from scan(p)
-    try:
-        Doer(abs_path=str(path)).save(force_insert=True)
-    except:
-        pass
+
+    Doer.create_no_error(abs_path=str(path))
 
 
 def path2file(

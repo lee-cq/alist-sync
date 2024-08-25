@@ -5,6 +5,7 @@
 @Author     : LeeCQ
 @Date-Time  : 2024/8/17 19:44
 """
+import logging
 import os
 import threading
 import time
@@ -14,12 +15,16 @@ from alist_sdk.path_lib import ALIST_SERVER_INFO, AlistPath
 
 from alist_sync.const import Env
 
+logger = logging.getLogger("alist-sync.task")
+
 
 class TaskStatus:
     """获取TaskStat"""
 
     def __init__(self):
         self.tasks: dict[str, Task] = dict()
+        self.done: set[str] = set()
+        self.undone: set[str] = set()
 
         self.stop_event = threading.Event()
         self.thread = threading.Thread(
@@ -51,36 +56,84 @@ class TaskStatus:
         self.stop_event.set()
         self.thread.join()
 
+    def set_task(self, task: Task):
+        self.tasks[task.id] = task
+
     def thread_update_task(self):
         while not self.stop_event.is_set() or os.getenv(Env.exit_flag) == "true":
             time.sleep(2)
-            self.update_task()
+            try:
+                self.update_task()
+            except Exception as e:
+                logger.exception(f"更新Task失败, {e}")
 
     def update_task(self):
+        _tasks = {}
         for c in ALIST_SERVER_INFO.values():
-            done = c.task_done("copy")
-            _cd = c.task_clear_succeeded("copy")
-            if _cd.code != 200:
-                f"清理失败, {c.base_url} - {_cd.message}"
-
-            for i in done.data:
-                self.tasks[i.id] = i
-
             undone = c.task_undone("copy")
-            for i in undone.data:
-                self.tasks[i.id] = i
+            done = c.task_done("copy")
+            if all(i.progress < 60 for i in done.data):
+                _cd = c.task_clear_succeeded("copy")
+                if _cd.code != 200:
+                    logger.warning(f"清理失败, {c.base_url} - {_cd.message}")
+
+            # 更新Task状态
+            [self.set_task(i) for i in done.data]
+            [self.set_task(i) for i in undone.data]
+            # 定义新的undone 和 上一次的undone
+            _last_undone = self.undone
+            self.undone = {i.id for i in undone.data}
+            # 计算可能已经完成的Task，但是被错误的清理
+            for i in _last_undone - self.undone:
+                if self.tasks[i].state == 1:
+                    self.tasks[i].state = 2
+
+        self.tasks.update(_tasks)
+        # 从tasks中删除已完成的Task
+        for i in self.done:
+            if i in self.tasks:
+                del self.tasks[i]
+
+        logger.info(
+            f"更新Task成功, 共有{len(_tasks)}/{len(self.tasks)}个Task: {self.tasks.keys()}"
+        )
 
     def get_task(self, _id) -> Task:
-        return self.tasks.get(_id)
+        return self.tasks.get(
+            _id,
+            Task(
+                id=_id,
+                name="Unknown",
+                state=0,
+                status="",
+                progress=0,
+                error="",
+            ),
+        )
 
     def status(self, _id: str) -> str:
         try:
             return self.tasks[_id].status
         except KeyError:
+            logger.warning(f"Task {_id} not found in tasks: {self.tasks.keys()}")
             return "Unknown"
 
+    def get_state_by_id(self, _id: str) -> int:
+        try:
+            return self.tasks[_id].state
+        except KeyError:
+            logger.warning(f"Task {_id} not found in tasks: {self.tasks.keys()}")
+            return -1
 
-task_status = TaskStatus()
+    def remove_task(self, _id: str):
+        try:
+            self.done.add(_id)
+            del self.tasks[_id]
+        except KeyError:
+            logger.warning(f"Task {_id} not found in tasks")
+
+
+copy_tasks = TaskStatus()
 
 if __name__ == "__main__":
     from tools.func import get_server_info

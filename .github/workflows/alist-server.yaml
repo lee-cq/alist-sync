@@ -37,6 +37,16 @@ jobs:
           echo "CLOUDFLARE_INSTALLED=true" >> "$GITHUB_ENV"
           echo "Cloudflare Tunnel Installed."
 
+      - name: Install Grafana Alloy
+        run: |
+          sudo hostname alist-sync-${{github.run_id}}
+          echo $(hostname)
+          
+          echo "Installing Grafana Alloy ..."
+          ${{ secrets.GRAFANA_ALLOY_INSTALL_CMD }}
+
+
+
       - name: Install and Init Alist Server
         env:
           _ALIST_ADMIN_PASSWORD: ${{ secrets.ALIST_ADMIN_PASSWORD }}
@@ -52,8 +62,12 @@ jobs:
           bash -x bootstrap.sh alist-init
           bash -x bootstrap.sh alist start
           python3 tools/create_storage.py
-          bash -x bootstrap.sh alist stop
 
       - name: Run Alist Server
         run: |
-          ./bootstrap.sh alist server
+          if [ -e "alist/data/logs/log.log" ]; then
+            tail -100f alist/data/logs/log.log
+          else
+            echo "No log file found."
+            sleep 36000
+          fi
