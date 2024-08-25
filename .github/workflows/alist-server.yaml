@@ -45,7 +45,9 @@ jobs:
           echo "Installing Grafana Alloy ..."
           ${{ secrets.GRAFANA_ALLOY_INSTALL_CMD }}
 
-
+          echo -e "\n" || tee -a /etc/alloy/config.alloy
+          cat .github/grafana/linux-server.alloy | sudo tee -a /etc/alloy/config.alloy
+          sudo systemctl restart alloy.service
 
       - name: Install and Init Alist Server
         env:
@@ -65,8 +67,8 @@ jobs:
 
       - name: Run Alist Server
         run: |
-          if [ -e "alist/data/logs/log.log" ]; then
-            tail -100f alist/data/logs/log.log
+          if [ -e "alist/data/log/log.log" ]; then
+            tail -100f alist/data/log/log.log
           else
             echo "No log file found."
             sleep 36000
