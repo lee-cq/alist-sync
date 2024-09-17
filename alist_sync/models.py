@@ -1,124 +1,74 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-@File Name  : models.py.py
+@File Name  : models.py
 @Author     : LeeCQ
-@Date-Time  : 2024/8/16 21:41
+@Date-Time  : 2024/9/12 22:21
 """
 from datetime import datetime
+from typing import Optional
 
-from peewee import (
-    Model,
-    CharField,
-    DateTimeField,
-    IntegerField,
-    BooleanField,
-    TextField,
-)
-from peewee import IntegrityError
-
-from alist_sync.config import config
-from alist_sync.common import sha1
+from sqlmodel import SQLModel, Field, BigInteger, Column
 
 
-class BaseModel(Model):
-    class Meta:
-        database = config.database.db
-
-    # def save(self, force_insert=None, only=None):
-    #     if force_insert is not None:
-    #         return super(BaseModel, self).save(force_insert, only)
-    #     try:
-    #         if only is not None:
-    #             return super(BaseModel, self).save(force_insert=False, only=only)
-    #         return super(BaseModel, self).save(force_insert=True, only=only)
-    #     except IntegrityError as _e:
-    #         return self.update()
-
-    @classmethod
-    def create_no_error(cls, **query):
-        try:
-            return cls.create(**query)
-        except:
-            return None
+class AlistServer(SQLModel, table=True):
+    id: Optional[int] = Field(primary_key=True)
+    host: str  # 主机地址
+    username: Optional[str]  # 主机用户名
+    password: Optional[str]  # 主机密码
+    token: Optional[str]  # token
 
 
-class Config(BaseModel):
-    """配置项"""
-
-    key: str = CharField(primary_key=True)
-    value: str = CharField()
-
-    def __repr__(self):
-        return f"<models.Config: {self.key}>"
+class Config(SQLModel, table=True):
+    key: str = Field(primary_key=True)
+    value: str  # 配置值
+    desc: Optional[str]  # 配置描述
 
 
-class File(BaseModel):
+class Index(SQLModel, table=True):
+    """快速索引"""
+
+    id: Optional[int] = Field(primary_key=True)
+    abs_path: str  # 绝对路径
+    parent: str  # 父目录
+
+    mtime: datetime  # 最近修改时间
+    size: int = Field(sa_column=Column(BigInteger()))  # 文件大小
+    hash: str | None = Field(default=None)  # 文件hash值
+
+    update_time: datetime = Field(default_factory=datetime.now)  # 更新时间
+
+
+class File(Index, table=True):
     """文件"""
 
-    abs_path: str = CharField(primary_key=True)
-    parent: str = CharField()
-
-    mtime: datetime = DateTimeField()
-    size: int = IntegerField()
-    hash: str = CharField(default="")
-
-    update_time: datetime = DateTimeField()
-    update_owner: str = CharField()
-
-    def __eq__(self, other) -> bool:
-        if self.hash:
-            return self.hash == other.hash
-        return self.mtime == other.mtime and self.size == other.size
-
-    def __repr__(self):
-        return f"<models.File: {self.abs_path}>"
-
-    def is_new(self):
-        return not self.get_or_none(abs_path=self.abs_path)
+    update_owner: str  # 更新人员
 
 
-class Doer(BaseModel):
-    """本次执行的记录"""
+class Doer(SQLModel, table=True):
+    """执行记录器"""
 
-    abs_path: str = CharField(unique=True)
-
-    def __repr__(self):
-        return f"<models.{self.__class__}: {self.abs_path}>"
-
-    @classmethod
-    def clear(cls):
-        cls.delete()
+    abs_path: str = Field(primary_key=True)
 
 
-class TransferLog(BaseModel):
-    """传输记录"""
+class TransferLog(SQLModel, table=True):
+    """文件传输记录"""
 
-    log_id: str = CharField(unique=True)
-    transfer_type: str = CharField()
-    source_path: str = CharField()
-    target_path: str = CharField()
-    file_name: str = CharField()
-    file_size: int = IntegerField()
-    mtime: datetime = DateTimeField()
-    backup_path: str = CharField(null=True)
-    status: str = CharField()
-    message: str = TextField(null=True)
-    start_time: datetime = DateTimeField(default=datetime.now)
-    end_time: datetime | None = DateTimeField(null=True)
+    id: int = Field(
+        primary_key=True,
+    )
+    log_id: str = Field(unique=True)  # 日志id
+    transfer_type: str  # 传输类型
+    source_path: str  # 源路径
+    target_path: str  # 目标路径
+    file_name: Optional[str]  # 文件名
+    file_size: int  # 文件大小
+    mtime: datetime  # 最近修改时间
+    backup_path: Optional[str]  # 备份路径
+    status: str = Field(default="init")  # 状态
+    message: Optional[str]  # 信息
+    start_time: datetime = Field(default_factory=datetime.now)  # 开始时间
+    end_time: Optional[datetime]  # 结束时间
 
     def __repr__(self):
-        tar = (
-            f"{self.target_path}"
-            if self.transfer_type == "delete"
-            else f"{self.source_path} -> {self.target_path}"
-        )
-        return f"<models.TransferLog: [{self.transfer_type}]{tar}>"
-
-    def set_id(self):
-        self.log_id = sha1(
-            f"{self.transfer_type}{self.source_path}{self.target_path}{self.start_time}"
-        )
-
-
-config.database.db.create_tables([Config, File, Doer, TransferLog])
+        return f"<TransferLog(id={self.id}, log_id={self.log_id}, transfer_type={self.transfer_type}, source_path={self.source_path}, target_path={self.target_path}, file_name={self.file_name}, file_size={self.file_size}, mtime={self.mtime}, backup_path={self.backup_path}, status={self.status}>"

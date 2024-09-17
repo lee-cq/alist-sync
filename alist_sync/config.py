@@ -8,13 +8,13 @@
 import logging
 import os
 import time
+from functools import cached_property
 from pathlib import Path
 from typing import Optional
-from functools import cached_property
+
+from sqlalchemy import Engine
 from yaml import safe_load
 
-import peewee
-from playhouse.db_url import connect as connect_db
 from pydantic import BaseModel
 from alist_sdk import AlistPath, AlistPathType, login_server
 
@@ -26,6 +26,7 @@ __all__ = [
     "SyncGroup",
     "config",
     "sync_trace",
+    "engine"
 ]
 
 from alist_sync.common import sha1
@@ -67,29 +68,44 @@ class Database(BaseModel):
     username: Optional[str] = "test"
     password: Optional[str] = "test"
     database: Optional[str] = "alist-sync"
+    pool_size: Optional[int] = 10  # 连接池大小
+    max_overflow: Optional[int] = 20  # 最大溢出连接数
 
     @cached_property
-    def db(self) -> peewee.Database:
+    def _engine(self) -> Engine:
+        from sqlalchemy import create_engine
+
         if self.url:
-            return connect_db(self.url)
+            uri = self.url
 
-        _dbc = {
-            "sqlite": peewee.SqliteDatabase,
-            "mysql": peewee.MySQLDatabase,
-            "postpresql": peewee.PostgresqlDatabase,
-            "": peewee.Database,
-        }.get(self.type)
+        elif self.type == "sqlite":
+            uri = f"sqlite:///{self.path}"
 
-        if self.type.lower() == "sqlite":
-            return _dbc(self.path)
-        elif self.type.lower() in ["mysql", "postgresql", "pg"]:
-            return _dbc(
-                self.database,
-                host=self.host,
-                port=self.port,
-                username=self.username,
-                password=self.password,
-            )
+        elif self.type == "mysql":
+            uri = f"mysql+pymysql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+
+        elif self.type == "postgresql":
+            uri = f"postgresql+psycopg2://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+        else:
+            raise ValueError("Invalid Database Type.")
+        logger.info(f"Database Connect: {uri}")
+        return create_engine(
+            uri, echo=True, pool_size=self.pool_size, max_overflow=self.max_overflow
+        )
+
+    def db(self):
+        from sqlmodel import SQLModel
+
+        SQLModel.metadata.create_all(self._engine)
+        logger.info(f"Database Create Success: [{self._engine.name}] {self._engine.url}", )
+        return self._engine
+
+    def session_factory(self):
+        from sqlalchemy.orm import sessionmaker
+
+        Session = sessionmaker(bind=self._engine)
+
+        return Session
 
 
 class AlistServer(BaseModel):
@@ -164,6 +180,8 @@ class Config(BaseModel):
 
 load_env()
 config = Config.load_from_yaml(os.getenv(Env.config, "config.yaml"))
-config.login()
 config.load_logger()
+engine = config.database.db()
+config.login()
+
 logger.info("Config Load Success.")
