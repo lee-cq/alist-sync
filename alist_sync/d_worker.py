@@ -4,19 +4,18 @@ import logging
 import sys
 import threading
 import time
-import traceback
 from pathlib import Path
 from queue import Queue, Empty
-from typing import Literal, Any, Type
+from typing import Literal, Any, Type, Self
 
+from httpx import Client
 from pydantic import BaseModel, computed_field, Field
 from pymongo.collection import Collection
-from httpx import Client, TimeoutException, Timeout
-from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 
-from alist_sync.config import create_config
+from alist_sdk.path_lib import AbsAlistPathType, AlistPath
 from alist_sync.common import sha1, prefix_in_threads, transfer_speed
-from alist_sync.err import WorkerError, RetryError
+from alist_sync.config import create_config
+from alist_sync.err import RetryError
 from alist_sync.thread_pool import MyThreadPoolExecutor
 from alist_sync.version import __version__
 
@@ -86,7 +85,7 @@ class Worker(BaseModel):
     def __repr__(self):
         return f"<Worker {self.type}: {self.source_path} -> {self.target_path}>"
 
-    def __lt__(self, other):
+    def __lt__(self, other: Self):
         return self.priority < other.priority
 
     @property
@@ -228,7 +227,6 @@ class Workers:
         # self.lockers |= sync_config.handle.load_locker()
         # for i in sync_config.handle.get_workers():
         #     self.add_worker(Worker(**i), is_loader=True)
-        _started = False
         while True:
             if (
                 queue.empty()
@@ -244,11 +242,8 @@ class Workers:
                 return
 
             try:
-                _started = True
                 self.add_worker(queue.get(timeout=3))
             except Empty:
-                if _started:
-                    continue
                 logger.info(
                     f"Checkers: 空 Scaner 队列, 如果没有新的任务, "
                     f"{sync_config.timeout - (time.time() - sync_config.start_time):d}"
