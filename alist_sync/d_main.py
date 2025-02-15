@@ -12,14 +12,12 @@ from queue import Queue
 from typing import Callable
 
 import alist_sdk
-
 from alist_sdk import AlistPath, login_server
-
+from alist_sync.common import beautify_size, all_thread_name
+from alist_sync.config import SyncGroup, create_config, AlistServer
+from alist_sync.d_checker import get_checker
 from alist_sync.d_worker import Workers
 from alist_sync.thread_pool import MyThreadPoolExecutor
-from alist_sync.config import SyncGroup, create_config, AlistServer
-from alist_sync.common import beautify_size, all_thread_name
-from alist_sync.d_checker import get_checker
 
 sync_config = create_config()
 logger = logging.getLogger("alist-sync.main")
@@ -105,7 +103,7 @@ def checker(sync_group: SyncGroup, _queue_worker: Queue) -> threading.Thread | N
         login_alist(sync_config.get_server(uri.as_uri()))
 
     _queue_scaner = Queue(30)
-    _scaner_pool = MyThreadPoolExecutor(5, "scaner_")
+    _scaner_pool = MyThreadPoolExecutor(5, "scaner_") # TODO ?
 
     _ct = get_checker(sync_group.type)(sync_group, _queue_scaner, _queue_worker).start()
 

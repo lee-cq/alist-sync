@@ -11,18 +11,17 @@ import fnmatch
 import logging
 import threading
 import time
+from functools import lru_cache
 from queue import Queue, Empty
 from typing import Iterator
-from functools import lru_cache
 
-from alist_sdk import AlistPath, RawItem, AlistPathType, Item
 from pydantic import BaseModel
 
+from alist_sdk import AlistPath, RawItem, AlistPathType, Item
+from alist_sync.common import prefix_in_threads
 from alist_sync.config import create_config, SyncGroup
 from alist_sync.d_worker import Worker
 from alist_sync.thread_pool import MyThreadPoolExecutor
-from alist_sync.common import prefix_in_threads
-
 
 logger = logging.getLogger("alist-sync.d_checker")
 sync_config = create_config()
@@ -50,7 +49,7 @@ class Checker:
         self.scaner_queue: Queue[AlistPath] = scaner_queue
 
         self.conflict: set = set()
-        self.pool = MyThreadPoolExecutor(10)
+        self.pool = MyThreadPoolExecutor(10, "checker_pool_" + sync_group.name)
         self.stat_sq = threading.Semaphore(4)
         self.main_thread = threading.Thread(
             target=self.main,
@@ -182,7 +181,7 @@ class CheckerCopy(Checker):
                 target_path=target_stat.path,
             )
 
-        logger.debug(f"Checked: [JUMP] {source_stat.path.as_uri()[4:]}")
+        logger.debug(f"Checked: [JUMP] {source_stat.path.as_uri().split('//')[-1]}")
         return None
 
 
