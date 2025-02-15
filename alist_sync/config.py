@@ -3,18 +3,17 @@ import logging
 import os
 import time
 from datetime import datetime
-from pathlib import Path
 from functools import cached_property, lru_cache
+from pathlib import Path
 from typing import Optional, Literal, TYPE_CHECKING, Any, Annotated
 
-from alist_sdk import AlistPathType, AlistPath
-from alist_sdk.path_lib import AlistPathPydanticAnnotation
 from httpx import URL
 from pydantic import Field, BaseModel, BeforeValidator
 from pymongo.database import Database
 
+from alist_sdk import AlistPathType, AlistPath
+from alist_sdk.path_lib import AlistPathPydanticAnnotation
 from alist_sync.common import data_size_to_bytes
-
 
 if TYPE_CHECKING:
     from alist_sync.data_handle import ShelveHandle, MongoHandle
@@ -55,7 +54,7 @@ def create_config():
     config_file = getenv(
         "ALIST_SYNC_CONFIG", Path(__file__).parent.parent / "config.yaml"
     )
-
+    print("Used config_file:", config_file)
     _sync_config = Config.load_from_yaml(config_file)
     setattr(builtins, "sync_config", _sync_config)
     return _sync_config
@@ -87,6 +86,9 @@ class AlistServer(BaseModel):
         )
         _data["server"] = _data.pop("base_url")
         return _data
+
+    def login(self):
+        pass
 
 
 def set_add(x) -> set:

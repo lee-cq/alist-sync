@@ -6,7 +6,6 @@ from pathlib import Path
 
 from typer import Typer, Option, echo
 
-
 logger = logging.getLogger("alist-sync.__main__")
 app = Typer()
 
@@ -50,7 +49,7 @@ def sync(
 ):
     """同步任务"""
     from alist_sync.config import create_config, getenv
-    from alist_sync.d_main import main, main_debug, main_new
+    from alist_sync.d_main import main_debug, main_new
 
     if config_file and Path(config_file).exists():
         os.environ["ALIST_SYNC_CONFIG"] = str(Path(config_file).resolve().absolute())
@@ -92,6 +91,17 @@ def cli_get(path: str):
         login_server(**s.dump_for_alist_path())
 
     echo(AlistPath(path).re_stat(retry=5, timeout=3).model_dump_json(indent=2))
+
+
+@app.command("worker")
+def cli_worker():
+    """启动一个Worker，从MongoDB中获取任务并执行"""
+    from alist_sync.config import create_config
+    from alist_sync.d_worker import Worker
+
+    sync_config = create_config()
+    _w = Worker()
+    _w.start()
 
 
 if __name__ == "__main__":
